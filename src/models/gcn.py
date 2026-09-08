@@ -1,12 +1,12 @@
 import torch.nn.functional as F
 from torch import nn
-from torch_geometric.nn import GCNConv
+from torch_geometric.nn import GCNConv, global_add_pool
 
 
 class GCN(nn.Module):
-    """Two-layer GCN that produces node embeddings for graph classification."""
+    """Two-layer GCN for graph classification."""
 
-    def __init__(self, in_channels, baseline_width=64):
+    def __init__(self, in_channels, baseline_width, num_classes):
         super().__init__()
 
         self.conv1 = GCNConv(
@@ -29,13 +29,19 @@ class GCN(nn.Module):
             bias=True,
         )
 
-    def forward(self, x, edge_index):
-        # [num_nodes, in_channels] -> [num_nodes, baseline_width]
+        self.classifier = nn.Linear(
+            baseline_width,
+            num_classes,
+        )
+
+    def forward(self, x, edge_index, batch):
         x = self.conv1(x, edge_index)
         x = F.relu(x)
 
-        # [num_nodes, baseline_width] -> [num_nodes, baseline_width]
         x = self.conv2(x, edge_index)
         x = F.relu(x)
+
+        x = global_add_pool(x, batch)
+        x = self.classifier(x)
 
         return x
