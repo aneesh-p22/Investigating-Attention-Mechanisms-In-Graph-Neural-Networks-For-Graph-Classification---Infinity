@@ -1619,3 +1619,229 @@
     - The selected epoch and its statistics are available for later result recording
 
 - Commit: 2.4 added validation state selection and restoration
+
+
+
+
+
+# 2.5 Result Recording and Source Provenance
+
+- Added src/recording.py to preserve development experiment evidence as JSON
+
+    - The recorder remains a small collection of ordinary functions rather than introducing an experiment-management framework
+
+    - get_source_commit runs git rev-parse HEAD through subprocess to obtain the exact Git commit containing the source used for the fit
+
+        - subprocess is needed because the commit identity comes from Git rather than Python itself
+
+        - The entire repository is not required to have a clean working tree
+
+        - Instead, the experiment source and effective settings used by the fit are committed before the recorded run
+
+    - get_result_path constructs a descriptive filename from the result purpose, model, dataset, optional variant and training seed
+
+        - The current result is therefore stored as results/development_gcn_mutag_seed0.json
+
+    - prepare_result_path creates the results directory when it does not already exist
+
+        - os.makedirs with exist_ok=True creates the directory when needed and leaves an existing directory unchanged
+
+        - The same function checks whether the intended result file already exists before training starts
+
+        - This prevents an expensive fit from being run when its intended result filename is already occupied
+
+    - save_result writes the JSON using file mode x
+
+        - Mode x refuses to replace an existing file
+
+        - The pre-fit path check and the write-time protection together prevent silent loss of earlier experiment evidence
+
+    - save_result also records the PyTorch, PyG and CUDA versions automatically
+
+- Added model and variant identity to the effective settings
+
+    - model=GCN is now used both as recorded experiment information and when constructing the result filename
+
+    - variant=None records that this ordinary GCN has no special experimental variant
+
+        - Python None becomes null when written as JSON
+
+    - The remaining effective settings are:
+
+        - dataset=MUTAG
+
+        - baseline_width=64
+
+        - learning_rate=0.01
+
+        - weight_decay=0.0005
+
+        - epochs=1000
+
+        - batch_size=32
+
+        - seed=0
+
+        - split_seed=0
+
+    - Ordinary unchanged Adam defaults remain library defaults rather than being added as experimental factors
+
+- Added source provenance before the recorded fit
+
+    - The successful fit records source commit 9898a4a8d4f8da9baf5460dcc28ee95d7422eaba
+
+    - This is the commit containing the experiment source and settings that produced the model
+
+    - The result JSON and completed log are committed afterwards in a separate commit
+
+    - The later result commit is therefore not confused with the source commit that produced the fit
+
+- Added training-pass runtime measurement
+
+    - time.perf_counter is used as the wall-clock timer
+
+    - Only train_epoch is inside the timed region
+
+    - The timed training pass therefore includes:
+
+        - Iterating through the training DataLoader
+
+        - Moving graph minibatches to the selected device
+
+        - Forward computation
+
+        - Cross-entropy calculation
+
+        - Backpropagation
+
+        - Adam parameter updates
+
+    - Validation, development-test evaluation and result writing remain outside the timed region
+
+    - CUDA work can execute asynchronously relative to Python, so torch.cuda.synchronize is called immediately before and after the timed region when CUDA is used
+
+        - This makes the wall-clock boundaries wait for the measured GPU work to complete
+
+- Kept the validation-selected state procedure from 2.4
+
+    - Every fit completes the fixed 1,000-epoch training budget
+
+    - No patience or early stopping is used
+
+    - Validation is evaluated after every epoch
+
+    - The state with the strictly smallest validation cross-entropy is selected
+
+    - An exact validation-loss tie retains the earlier epoch
+
+    - The selected model tensors are preserved with PyTorch clone and restored after epoch 1,000
+
+- Added direct parameter counting to the experiment evidence
+
+    - parameter.numel() gives the number of scalar values stored in one parameter tensor
+
+    - Summing numel across all model parameters gives the total parameter count
+
+    - Summing only parameters whose requires_grad value is True gives the active trainable parameter count
+
+- Added the dataset loader and feature policy to the recorded result
+
+    - cleaned=False records use of the ordinary rather than cleaned TU dataset
+
+    - use_node_attr=False records that additional node attributes are not requested
+
+    - use_edge_attr=False records that additional continuous edge attributes are not requested
+
+    - MUTAG categorical node labels are still used as the node features supplied to the GCN
+
+    - Graph connectivity is used through edge_index
+
+    - Edge features are not supplied to the GCN
+
+- Added the original development partition indices
+
+    - The JSON contains the original graph indices for all three development partitions
+
+    - 150 graphs are assigned to training
+
+    - 18 graphs are assigned to validation
+
+    - 20 graphs are assigned to the development test
+
+    - These counts account for all 188 MUTAG graphs
+
+    - Recording original indices preserves the identities of the graphs used in each role rather than only preserving partition sizes
+
+- Added validation-selection evidence to the JSON
+
+    - The criterion is recorded as minimum validation cross-entropy
+
+    - The tie rule is recorded as earliest exact tie
+
+    - early_stopping=False explicitly records the fixed-epoch procedure
+
+    - All 1,000 epochs completed
+
+    - Epoch 384 was selected
+
+        - Its validation loss was 0.256849080324173
+
+        - Its validation accuracy was 0.8333333333333334, corresponding to 15 of the 18 validation graphs
+
+    - Some printed epochs reached higher validation accuracy, but they were not selected because validation loss rather than validation accuracy is the selection criterion
+
+    - Epoch 384 is not one of the ten-epoch reporting points
+
+        - This confirms that model-state selection is performed after every epoch while terminal progress is only printed every ten epochs
+
+- Added the development-test result
+
+    - The development test is evaluated only after the validation-selected state has been restored
+
+    - Development-test loss was 0.49510836601257324
+
+    - Development-test accuracy was 0.8, corresponding to 16 of the 20 development-test graphs
+
+    - The result remains explicitly identified as development evidence rather than final cross-validation evidence
+
+- Recorded model size and runtime
+
+    - The GCN has 4,802 total parameters
+
+    - All 4,802 parameters are trainable
+
+        - This agrees with the parameter count established when the complete GCN was built in 2.2
+
+    - The 1,000 timed training passes took 37.63074249937199 seconds in total
+
+    - Mean timed training-pass duration was 0.03763074249937199 seconds per epoch, approximately 37.6 milliseconds
+
+- Recorded execution environment
+
+    - The run used CUDA on an NVIDIA GeForce RTX 4070 Laptop GPU
+
+    - PyTorch version was 2.13.0+cu130
+
+    - PyG version was 2.8.0.post1
+
+    - CUDA version was 13.0
+
+    - Recording the device and relevant software versions provides the execution context needed for reproducibility and later runtime comparisons
+
+- Inspected the actual development JSON
+
+    - results/development_gcn_mutag_seed0.json contains the expected purpose, settings, loader policy, feature policy, partitions, validation-selection evidence, development-test metrics, parameter counts, runtime information, device information, software versions and source commit
+
+    - The values in the JSON agree with the successful terminal execution
+
+    - The recorded source commit exactly matches the commit printed before training began
+
+- A recording failure exposed one missing filesystem requirement during development
+
+    - An earlier 1,000-epoch attempt completed training but failed when saving because the results directory did not yet exist
+
+    - prepare_result_path was therefore changed to create the results directory before training begins
+
+    - The successful recorded fit then completed and saved the JSON normally
+
+- Commit: 2.5 recorded the GCN development fit
