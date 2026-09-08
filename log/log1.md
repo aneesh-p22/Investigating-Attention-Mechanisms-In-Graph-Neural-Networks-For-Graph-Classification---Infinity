@@ -259,3 +259,75 @@
     - Full dataset statistics, batching and dataset partitions remain unverified and belong to later Stage 1 work
 
 - Commit: 1.2 inspected MUTAG graph tensors and connectivity
+
+
+
+
+
+# 1.3 Dataset Statistics
+
+- Extended experiments/datasets/inspect_mutag.py with a short loop over all 188 graphs to establish dataset-wide class counts, graph sizes and feature dimensions
+
+    - The loop records only the information required for the summary rather than printing or individually inspecting every graph
+
+- Counted the graph-level target classes using graph.y.item()
+
+    - Observed 63 graphs with class 0 and 125 graphs with class 1, accounting for all 188 examples
+
+    - MUTAG is therefore class-imbalanced, with class 1 occurring almost twice as often as class 0
+
+    - This matters for later dataset partitioning because small random partitions could otherwise contain distorted class proportions
+
+    - The agreed development partition will therefore use stratification so that each partition retains the class distribution as closely as its integer size permits
+
+- Recorded the number of nodes in every graph using graph.num_nodes
+
+    - Observed a minimum of 10 nodes, a mean of 17.93 and a maximum of 28
+
+    - Graph size therefore varies across MUTAG rather than every example containing the same number of nodes
+
+    - The model must handle this variable number of nodes while accepting the same feature width for each node
+
+    - Larger graphs also require more node representations and message-passing operations, so graph size contributes to computational cost
+
+- Recorded graph.num_edges for every graph
+
+    - Observed between 20 and 66 stored edge entries per graph, with a mean of 39.59
+
+    - These values describe the number of entries stored in edge_index rather than a separately verified dataset-wide count of undirected molecular edges
+
+    - Reciprocal undirected storage was established for the two graphs inspected in 1.2, but this statistics loop did not repeat that connectivity test across every graph
+
+- Established node-feature consistency across the dataset
+
+    - Added graph.x.shape[1] from every graph to a set and obtained {7}
+
+    - A set retains each different value only once, so this establishes that all 188 graphs have seven node-feature columns
+
+    - Graphs therefore have node-feature matrices of shape [N, 7], where N varies with graph size but the feature width remains fixed
+
+    - This consistent width allows the same first GNN layer to process every graph and determines its input width as seven
+
+- Established edge-feature consistency across the dataset
+
+    - Added graph.edge_attr.shape[1] from every graph to a set and obtained {4}
+
+    - Every MUTAG graph therefore has four edge-feature columns
+
+    - These categorical edge features remain consistently represented even though the principal models will deliberately exclude them from their inputs
+
+- Execution
+
+    - Ran python -m experiments.datasets.inspect_mutag
+
+    - Observed class counts of 63 for class 0 and 125 for class 1
+
+    - Observed 10 to 28 nodes per graph with a mean of 17.93
+
+    - Observed 20 to 66 stored edge entries per graph with a mean of 39.59
+
+    - Confirmed a node-feature width of seven and an edge-feature width of four across all 188 graphs
+
+    - Graph minibatching and development partitioning remain unverified and are handled in the next Stage 1 substages
+
+- Commit: 1.3 recorded MUTAG dataset statistics

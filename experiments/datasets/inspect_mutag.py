@@ -97,3 +97,34 @@ for graph_number, graph in [(1, graph_1), (2, graph_2)]:
     neighbours = edge_index[0, incoming_mask]
 
     print(f"Nodes with stored edges into node {node}: {neighbours}")
+
+class_counts = [0] * dataset.num_classes
+node_counts = []
+edge_counts = []
+node_feature_widths = set()
+edge_feature_widths = set()
+
+for graph in dataset:
+    class_counts[graph.y.item()] += 1
+    node_counts.append(graph.num_nodes)
+    edge_counts.append(graph.num_edges)
+    node_feature_widths.add(graph.x.shape[1])
+    edge_feature_widths.add(graph.edge_attr.shape[1])
+
+mean_nodes = sum(node_counts) / len(node_counts)
+mean_edges = sum(edge_counts) / len(edge_counts)
+
+print()
+print("Dataset statistics")
+print(f"Class 0 graphs: {class_counts[0]}")
+print(f"Class 1 graphs: {class_counts[1]}")
+print(
+    f"Nodes per graph: min={min(node_counts)}, "
+    f"mean={mean_nodes:.2f}, max={max(node_counts)}"
+)
+print(
+    f"Stored edge entries per graph: min={min(edge_counts)}, "
+    f"mean={mean_edges:.2f}, max={max(edge_counts)}"
+)
+print(f"Node feature widths: {node_feature_widths}")
+print(f"Edge feature widths: {edge_feature_widths}")
