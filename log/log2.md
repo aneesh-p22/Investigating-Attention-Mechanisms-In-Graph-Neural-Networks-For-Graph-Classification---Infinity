@@ -1317,3 +1317,305 @@
     - Model-state selection and restoration remain deliberately unimplemented until 2.4
 
 - Commit: 2.3 added ordinary fitting and validation
+
+
+
+
+
+# 2.4 Validation-Selected State and Restoration
+
+- Extended the fixed 1,000-epoch fitting procedure with validation-based model-state selection
+
+    - Ordinary fitting in 2.3 evaluated the validation partition after every epoch but did not preserve a particular model state
+
+    - The model remaining after 2.3 was simply the state produced by epoch 1,000
+
+    - The 2.3 validation trajectory showed that earlier epochs could have substantially lower validation loss than the final epoch
+
+    - 2.4 therefore selects the state with the lowest validation loss across the complete fit rather than automatically assessing the final training state
+
+- Kept the fixed training length of 1,000 epochs
+
+    - No patience or early stopping is used
+
+    - Every fit completes exactly the number of epochs specified by settings["epochs"]
+
+    - Validation determines which fitted state is retained but does not determine when fitting stops
+
+    - This keeps the optimisation budget fixed while allowing model selection to choose an earlier state
+
+- Added train_model to contain fixed-epoch fitting and validation-state selection
+
+    - train_model receives the model, training loader, validation loader, optimiser, device and number of epochs
+
+    - It reuses train_epoch for parameter optimisation
+
+    - It reuses evaluate for validation measurement
+
+    - The function does not depend on GCN-specific layers
+
+        - It only requires a graph classifier that accepts x, edge_index and batch and returns graph-level logits
+
+        - The same fitting procedure can therefore later be reused by GraphSAGE, GIN, GAT and GATv2
+
+    - The function remains in experiments/train.py while only one model currently uses it
+
+- Added best_epoch to record the selected epoch
+
+    - best_epoch starts at 0 before any model state has been evaluated
+
+    - Validation loss is inspected after every completed training epoch
+
+    - Whenever validation loss becomes strictly lower than every value previously observed, best_epoch is replaced with the current epoch number
+
+    - Selection is performed every epoch even though progress is only printed every ten epochs
+
+        - The selected epoch therefore does not need to appear in the printed progress output
+
+- Added best_val_loss as the model-selection criterion
+
+    - best_val_loss starts at positive infinity using float("inf")
+
+    - The first finite validation loss is therefore guaranteed to become the initial selected value
+
+    - A later epoch replaces it only when val_loss < best_val_loss
+
+    - The strict less-than comparison means an exactly equal validation loss does not replace the existing selected state
+
+        - The earlier epoch is therefore retained in an exact tie
+
+    - Validation cross-entropy rather than validation accuracy determines which model state is selected
+
+- Added best_val_accuracy to record the accuracy belonging to the selected state
+
+    - best_val_accuracy is only updated when validation loss strictly improves
+
+    - It therefore records the validation accuracy produced by the same epoch as best_val_loss
+
+    - Validation accuracy does not independently choose another epoch
+
+    - best_epoch, best_val_loss and best_val_accuracy consequently describe one consistent model state
+
+- Added preservation of the selected model state using PyTorch tensor cloning
+
+    - model.state_dict() provides the current model state as named parameter and buffer tensors
+
+    - These tensors contain the numerical state reached at the current training epoch
+
+    - Training continues after an epoch becomes selected, so the current model parameters continue to change
+
+    - Recording only the selected epoch number would therefore not preserve the model produced by that epoch
+
+    - When validation loss strictly improves, every tensor in model.state_dict() is copied using value.clone()
+
+    - clone creates a new PyTorch tensor containing the same numerical values with independent tensor storage
+
+        - Later optimiser updates to the current model therefore do not alter the cloned values stored in best_state
+
+    - A dictionary comprehension retains the original state-dictionary names while cloning every tensor
+
+    - Only one selected state is retained at a time
+
+        - If a later epoch improves validation loss, its cloned state replaces the previous best_state
+
+        - A separate model is therefore not stored for every one of the 1,000 epochs
+
+    - Using clone keeps the state preservation entirely within PyTorch and avoids requiring copy or deepcopy
+
+- Restored the validation-selected state after all 1,000 epochs
+
+    - The training loop always continues through epoch 1,000
+
+    - At the end of the loop, the model initially contains the parameters produced by the final training epoch
+
+    - model.load_state_dict(best_state) replaces those values with the cloned parameters from the minimum-validation-loss epoch
+
+    - The model used after train_model therefore corresponds to the selected validation state rather than automatically to epoch 1,000
+
+- Added selected-state statistics as return values from train_model
+
+    - best_epoch gives the epoch at which the minimum validation loss occurred
+
+    - best_val_loss gives that epoch's graph-mean validation cross-entropy
+
+    - best_val_accuracy gives the validation accuracy produced by that same state
+
+    - train_model returns these three values after restoring best_state
+
+    - The model itself does not need to be separately returned because load_state_dict changes the existing model object in place
+
+- Kept restoration handling minimal
+
+    - No duplicate validation evaluation is performed immediately after restoring best_state
+
+    - The selected validation loss and accuracy were already measured and stored when the selected state was originally encountered
+
+    - The permanent implementation therefore focuses only on selecting, preserving, restoring and subsequently assessing the selected model
+
+- Added the development test DataLoader
+
+    - stratified_split now retains test_indices rather than discarding the third development partition
+
+    - dataset[test_indices] selects the 20 development-test graphs established in Stage 1
+
+    - batch_size remains 32
+
+    - shuffle=False is used because the development test is evaluated rather than trained
+
+    - All 20 development-test graphs therefore fit into one minibatch
+
+- Added one preliminary development-test assessment after model selection
+
+    - The test loader is not supplied to train_model
+
+        - Development-test graphs therefore cannot influence gradients, parameter updates, validation loss or selection of the model epoch
+
+    - Test evaluation occurs only after the complete 1,000-epoch fit has finished and the validation-selected state has been restored
+
+    - The existing evaluate function is reused
+
+        - model.eval() places the model in evaluation mode
+
+        - torch.no_grad() disables gradient tracking
+
+        - No parameter updates occur
+
+    - The output is labelled Preliminary development test
+
+        - This holdout provides an initial assessment of the working development procedure
+
+        - It is not treated as the final project performance estimate
+
+- Ran python -m experiments.train successfully for the complete 1,000-epoch fit
+
+    - The run used the same fixed settings as 2.3:
+
+        - dataset: MUTAG
+
+        - baseline_width: 64
+
+        - learning_rate: 0.01
+
+        - weight_decay: 0.0005
+
+        - epochs: 1000
+
+        - batch_size: 32
+
+        - seed: 0
+
+        - split_seed: 0
+
+    - Execution used CUDA
+
+    - The development partition contained:
+
+        - 150 training graphs
+
+        - 18 validation graphs
+
+        - 20 development-test graphs
+
+- Training continued through epoch 1,000 as intended
+
+    - There was no patience counter or early-stopping condition
+
+    - The final printed epoch had:
+
+        - Training loss: 0.2937
+
+        - Training accuracy: 0.8800
+
+        - Validation loss: 0.3095
+
+        - Validation accuracy: 0.9444
+
+    - The epoch-1,000 validation loss was not the lowest validation loss encountered during training
+
+        - This confirms that the final model state and the validation-selected model state were different
+
+- The selected model occurred at epoch 337
+
+    - Selected epoch: 337
+
+    - Selected validation loss: 0.2589
+
+    - Selected validation accuracy: 0.9444
+
+    - A validation accuracy of 0.9444 on 18 graphs corresponds to 17 correct graph predictions out of 18
+
+    - Epoch 337 did not appear in the terminal's ten-epoch progress output
+
+        - This directly confirms that validation-state selection was being performed after every epoch rather than only at printed checkpoints
+
+        - Restricting selection to multiples of ten would therefore have missed the actual selected state
+
+- The selected validation loss was substantially lower than the loss at the final epoch
+
+    - Selected validation loss at epoch 337: 0.2589
+
+    - Validation loss at epoch 1,000: 0.3095
+
+    - The difference demonstrates why the epoch-1,000 parameter state should not automatically be used for assessment
+
+    - Restoring the cloned epoch-337 state ensures that development-test evaluation uses the model chosen by the validation criterion
+
+- The selected epoch was not simply the epoch with an unusually high validation accuracy
+
+    - Validation accuracy of 0.9444 appeared at many other epochs during training
+
+    - Only epoch 337 achieved the minimum validation loss of 0.2589 across the complete 1,000-epoch fit
+
+    - This illustrates the distinction between the selection criterion and the additional statistic recorded for the selected state
+
+        - Validation loss determines which state is selected
+
+        - Validation accuracy describes the selected state once it has been chosen
+
+- The restored selected model was evaluated once on the development test partition
+
+    - Preliminary development-test loss: 0.5301
+
+    - Preliminary development-test accuracy: 0.7500
+
+    - With 20 development-test graphs, an accuracy of 0.7500 corresponds to 15 correctly classified graphs and 5 incorrectly classified graphs
+
+    - This test result is lower than the selected validation accuracy of 0.9444
+
+        - The validation partition contains only 18 graphs and the development-test partition contains only 20, so both are small samples
+
+        - The difference is an observed development result rather than a reason to change the fixed training or model-selection procedure
+
+    - The test result was obtained only after validation-based selection had already been completed
+
+        - It therefore did not influence which epoch or parameter state was retained
+
+- The completed 2.4 procedure now distinguishes fitting, selection and assessment
+
+    - Training data determines parameter updates
+
+    - Validation loss selects one state from the 1,000 states produced during fitting
+
+    - PyTorch clone preserves that selected state independently of later optimisation
+
+    - load_state_dict restores the selected state after the fixed training budget has finished
+
+    - The selected epoch and its validation loss and accuracy are returned explicitly
+
+    - The development test then provides one preliminary assessment of that restored state
+
+- Stage 2.4 therefore establishes the complete validation-selected development fitting procedure required before result recording
+
+    - The model is no longer assessed simply because it is the final epoch
+
+    - Selection uses every epoch rather than only printed checkpoints
+
+    - Selected-state preservation is independent of subsequent optimiser updates
+
+    - No patience or early stopping is used
+
+    - Every fit receives the same fixed 1,000-epoch training budget
+
+    - The selected epoch and its statistics are available for later result recording
+
+- Commit: 2.4 added validation state selection and restoration

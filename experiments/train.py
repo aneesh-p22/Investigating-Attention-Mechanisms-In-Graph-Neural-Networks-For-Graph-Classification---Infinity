@@ -99,10 +99,62 @@ def evaluate(model, loader, device):
     return mean_loss, accuracy
 
 
+def train_model(
+    model,
+    train_loader,
+    val_loader,
+    optimizer,
+    device,
+    epochs,
+):
+    """Train for fixed epochs and restore the lowest-validation-loss state."""
+    best_epoch = 0
+    best_val_loss = float("inf")
+    best_val_accuracy = 0.0
+    best_state = None
+
+    for epoch in range(1, epochs + 1):
+        train_loss, train_accuracy = train_epoch(
+            model,
+            train_loader,
+            optimizer,
+            device,
+        )
+
+        val_loss, val_accuracy = evaluate(
+            model,
+            val_loader,
+            device,
+        )
+
+        if val_loss < best_val_loss:
+            best_epoch = epoch
+            best_val_loss = val_loss
+            best_val_accuracy = val_accuracy
+
+            best_state = {
+                name: value.clone()
+                for name, value in model.state_dict().items()
+            }
+
+        if epoch % 10 == 0:
+            print(
+                f"Epoch {epoch:4d} | "
+                f"train loss {train_loss:.4f} | "
+                f"train accuracy {train_accuracy:.4f} | "
+                f"val loss {val_loss:.4f} | "
+                f"val accuracy {val_accuracy:.4f}"
+            )
+
+    model.load_state_dict(best_state)
+
+    return best_epoch, best_val_loss, best_val_accuracy
+
+
 def main():
     dataset = load_dataset(settings["dataset"])
 
-    train_indices, val_indices, _ = stratified_split(
+    train_indices, val_indices, test_indices = stratified_split(
         dataset,
         settings["split_seed"],
     )
@@ -121,6 +173,12 @@ def main():
 
     val_loader = DataLoader(
         dataset[val_indices],
+        batch_size=settings["batch_size"],
+        shuffle=False,
+    )
+
+    test_loader = DataLoader(
+        dataset[test_indices],
         batch_size=settings["batch_size"],
         shuffle=False,
     )
@@ -150,34 +208,36 @@ def main():
     print(f"Device: {device}")
     print(f"Training graphs: {len(train_indices)}")
     print(f"Validation graphs: {len(val_indices)}")
-    print(f"Training batches: {len(train_loader)}")
-    print(f"Validation batches: {len(val_loader)}")
+    print(f"Test graphs: {len(test_indices)}")
 
     print()
     print("Training:")
 
-    for epoch in range(1, settings["epochs"] + 1):
-        train_loss, train_accuracy = train_epoch(
-            model,
-            train_loader,
-            optimizer,
-            device,
-        )
+    best_epoch, best_val_loss, best_val_accuracy = train_model(
+        model,
+        train_loader,
+        val_loader,
+        optimizer,
+        device,
+        settings["epochs"],
+    )
 
-        val_loss, val_accuracy = evaluate(
-            model,
-            val_loader,
-            device,
-        )
+    print()
+    print("Selected state:")
+    print(f"Selected epoch: {best_epoch}")
+    print(f"Selected validation loss: {best_val_loss:.4f}")
+    print(f"Selected validation accuracy: {best_val_accuracy:.4f}")
 
-        if epoch % 10 == 0:
-            print(
-                f"Epoch {epoch:4d} | "
-                f"train loss {train_loss:.4f} | "
-                f"train accuracy {train_accuracy:.4f} | "
-                f"val loss {val_loss:.4f} | "
-                f"val accuracy {val_accuracy:.4f}"
-            )
+    test_loss, test_accuracy = evaluate(
+        model,
+        test_loader,
+        device,
+    )
+
+    print()
+    print("Preliminary development test:")
+    print(f"Test loss: {test_loss:.4f}")
+    print(f"Test accuracy: {test_accuracy:.4f}")
 
 
 if __name__ == "__main__":
