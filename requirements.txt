@@ -1,0 +1,6 @@
+--extra-index-url https://download.pytorch.org/whl/cu130
+
+numpy==2.5.3
+torch==2.13.0+cu130
+torch_geometric==2.8.0.post1
+matplotlib==3.11.1

@@ -137,3 +137,91 @@
     - In result.cpu().tolist(), the CPU transfer happens first, followed by conversion to lists
 
     - These operations return results without moving or replacing the original tensor in place
+
+
+
+
+
+# 0.3 Package Pins and Minimal Layout
+
+- Created requirements.txt using the versions verified in Stage 0.2
+
+    - NumPy: 2.5.3
+
+    - PyTorch: 2.13.0+cu130
+
+    - PyTorch Geometric: 2.8.0.post1
+
+    - Matplotlib: 3.11.1
+
+    - The == notation pins a package to an exact version
+
+    - The +cu130 suffix identifies the CUDA 13.0 PyTorch build
+
+- Included the PyTorch package source in requirements.txt
+
+    - Added --extra-index-url https://download.pytorch.org/whl/cu130
+
+    - This makes the PyTorch CUDA package index available alongside the default Python Package Index, PyPI
+
+    - All project packages can be installed with python -m pip install -r requirements.txt
+
+    - The -r option tells pip to read requirements from the specified file
+
+    - Pip also installs dependencies required by the listed packages
+
+- Added environment setup instructions to README.md
+
+    - Recorded the verified Python version, operating system, GPU and NVIDIA driver
+
+    - Documented virtual environment creation and activation
+
+    - Used one requirements-file installation command for the project packages
+
+    - Explained that the virtual environment and downloaded datasets are excluded from Git
+
+- Clarified Python installation and package installation
+
+    - Python must be installed before creating a virtual environment or running pip
+
+    - requirements.txt installs packages into an existing Python environment
+
+    - It does not install the Python interpreter
+
+    - Python 3.14 was selected to match the verified environment
+
+- Defined the minimal package layout
+
+    - experiments will contain executable project scripts
+
+    - experiments/datasets will contain dataset inspection scripts
+
+    - Empty __init__.py files will mark these directories as regular Python packages
+
+    - Additional source files will be introduced when their functionality is needed
+
+- Explained module execution
+
+    - A module name uses dots to identify its position within packages
+
+    - The future file experiments/datasets/inspect_mutag.py will have the module name experiments.datasets.inspect_mutag
+
+    - python -m locates and executes a module
+
+    - Project module commands will run from the repository root so Python can find the local packages
+
+- Execution
+
+    - Get-Content requirements.txt displayed the correct package pins and additional package index
+
+    - Get-Content README.md displayed the environment setup instructions
+
+    - Ran python -m pip install --dry-run -r requirements.txt
+
+    - The --dry-run option reports what pip would install without installing packages
+
+    - Pip recognised both PyPI and the PyTorch CUDA package index
+
+    - All specified requirements were already satisfied in .venv
+
+    - Package layout creation and the README development-status update are pending confirmation
