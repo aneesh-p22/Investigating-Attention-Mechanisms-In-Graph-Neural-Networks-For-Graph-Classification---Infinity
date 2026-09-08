@@ -1,3 +1,5 @@
+import time
+
 import torch
 import torch.nn.functional as F
 from torch.optim import Adam
@@ -5,9 +7,16 @@ from torch_geometric.loader import DataLoader
 
 from src.data import load_dataset, set_seed, stratified_split
 from src.models.gcn import GCN
+from src.recording import (
+    check_result_path,
+    get_result_path,
+    get_source_commit,
+    save_result,
+)
 
 
 settings = {
+    "model": "GCN",
     "dataset": "MUTAG",
     "baseline_width": 64,
     "learning_rate": 0.01,
@@ -112,14 +121,25 @@ def train_model(
     best_val_loss = float("inf")
     best_val_accuracy = 0.0
     best_state = None
+    training_seconds = 0.0
 
     for epoch in range(1, epochs + 1):
+        if device.type == "cuda":
+            torch.cuda.synchronize()
+
+        start_time = time.perf_counter()
+
         train_loss, train_accuracy = train_epoch(
             model,
             train_loader,
             optimizer,
             device,
         )
+
+        if device.type == "cuda":
+            torch.cuda.synchronize()
+
+        training_seconds += time.perf_counter() - start_time
 
         val_loss, val_accuracy = evaluate(
             model,
@@ -148,10 +168,25 @@ def train_model(
 
     model.load_state_dict(best_state)
 
-    return best_epoch, best_val_loss, best_val_accuracy
+    return (
+        best_epoch,
+        best_val_loss,
+        best_val_accuracy,
+        training_seconds,
+    )
 
 
 def main():
+    result_type = "development"
+
+    result_path = get_result_path(
+        settings,
+        result_type,
+    )
+
+    check_result_path(result_path)
+    source_commit = get_source_commit()
+
     dataset = load_dataset(settings["dataset"])
 
     train_indices, val_indices, test_indices = stratified_split(
@@ -205,6 +240,7 @@ def main():
         print(f"{name}: {value}")
 
     print()
+    print(f"Source commit: {source_commit}")
     print(f"Device: {device}")
     print(f"Training graphs: {len(train_indices)}")
     print(f"Validation graphs: {len(val_indices)}")
@@ -213,7 +249,12 @@ def main():
     print()
     print("Training:")
 
-    best_epoch, best_val_loss, best_val_accuracy = train_model(
+    (
+        best_epoch,
+        best_val_loss,
+        best_val_accuracy,
+        training_seconds,
+    ) = train_model(
         model,
         train_loader,
         val_loader,
@@ -222,22 +263,111 @@ def main():
         settings["epochs"],
     )
 
-    print()
-    print("Selected state:")
-    print(f"Selected epoch: {best_epoch}")
-    print(f"Selected validation loss: {best_val_loss:.4f}")
-    print(f"Selected validation accuracy: {best_val_accuracy:.4f}")
-
     test_loss, test_accuracy = evaluate(
         model,
         test_loader,
         device,
     )
 
+    total_parameters = sum(
+        parameter.numel()
+        for parameter in model.parameters()
+    )
+
+    trainable_parameters = sum(
+        parameter.numel()
+        for parameter in model.parameters()
+        if parameter.requires_grad
+    )
+
+    mean_training_seconds = (
+        training_seconds / settings["epochs"]
+    )
+
+    if device.type == "cuda":
+        device_name = torch.cuda.get_device_name(device)
+    else:
+        device_name = "CPU"
+
+    result = {
+        "purpose": result_type,
+        "model": settings["model"],
+        "variant": settings.get("variant"),
+        "settings": settings,
+        "dataset": {
+            "cleaned": False,
+            "use_node_attr": False,
+            "use_edge_attr": False,
+        },
+        "feature_policy": {
+            "node_features": True,
+            "connectivity": True,
+            "edge_features": False,
+        },
+        "partitions": {
+            "train_indices": train_indices,
+            "validation_indices": val_indices,
+            "test_indices": test_indices,
+        },
+        "selection": {
+            "criterion": "minimum validation cross-entropy",
+            "tie_rule": "earliest exact tie",
+            "early_stopping": False,
+            "selected_epoch": best_epoch,
+            "completed_epochs": settings["epochs"],
+            "validation_loss": best_val_loss,
+            "validation_accuracy": best_val_accuracy,
+        },
+        "development_test": {
+            "loss": test_loss,
+            "accuracy": test_accuracy,
+        },
+        "parameters": {
+            "total": total_parameters,
+            "trainable": trainable_parameters,
+        },
+        "runtime": {
+            "training_seconds": training_seconds,
+            "mean_seconds_per_epoch": mean_training_seconds,
+            "convention": (
+                "training pass only; includes loader iteration, "
+                "device transfer, forward pass, loss, backward pass "
+                "and optimiser update; excludes validation, test "
+                "and result writing"
+            ),
+        },
+        "device": {
+            "type": str(device),
+            "name": device_name,
+        },
+        "source_commit": source_commit,
+    }
+
+    save_result(
+        result_path,
+        result,
+    )
+
     print()
-    print("Preliminary development test:")
+    print("Selected state:")
+    print(f"Selected epoch: {best_epoch}")
+    print(f"Selected validation loss: {best_val_loss:.4f}")
+    print(f"Selected validation accuracy: {best_val_accuracy:.4f}")
+
+    print()
+    print("Development test:")
     print(f"Test loss: {test_loss:.4f}")
     print(f"Test accuracy: {test_accuracy:.4f}")
+
+    print()
+    print(f"Total parameters: {total_parameters}")
+    print(f"Trainable parameters: {trainable_parameters}")
+    print(f"Training seconds: {training_seconds:.4f}")
+    print(
+        f"Mean training seconds per epoch: "
+        f"{mean_training_seconds:.4f}"
+    )
+    print(f"Saved result: {result_path}")
 
 
 if __name__ == "__main__":
