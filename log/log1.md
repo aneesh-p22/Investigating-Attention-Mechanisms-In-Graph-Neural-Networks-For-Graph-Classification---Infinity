@@ -133,3 +133,129 @@
     - Individual tensor contents, categorical encodings, numerical target mappings, graph connectivity, graph sizes, batching and dataset partitions remain unverified
 
 - Commit: 1.1 loaded and identified MUTAG
+
+
+
+
+
+# 1.2 Anatomy and Connectivity
+
+- Inspected two individual MUTAG graphs to understand the tensors stored inside each PyG Data object
+
+    - Graph 1 contained 17 nodes and 38 stored edge entries, while Graph 2 contained 13 nodes and 28 stored edge entries
+
+    - This confirmed that individual graphs can have different numbers of nodes and edges while retaining the same feature dimensions
+
+- Inspected x, the node-feature matrix
+
+    - Graph 1 had shape [17, 7] and Graph 2 had shape [13, 7]
+
+        - Each row represents one node and the seven columns represent the seven possible categorical node types
+
+        - The first dimension therefore changes with the number of nodes, while the feature width remains seven for every graph
+
+    - x used the float32 dtype and its observed rows were one-hot vectors
+
+        - A one-hot vector has one active value of 1, with its position identifying the node category
+
+        - The floating-point representation allows the categorical values to be used as neural-network inputs; it does not make them continuous measurements
+
+    - Verified the MUTAG node-label mapping from the dataset documentation
+
+        - The seven channels represent C, N, O, F, I, Cl and Br respectively
+
+        - Both inspected graphs contained C, N and O among their observed node-feature rows
+
+        - The first five nodes in both graphs were represented by the carbon channel
+
+- Inspected edge_index, which stores graph connectivity
+
+    - Graph 1 had shape [2, 38] and Graph 2 had shape [2, 28]
+
+        - Each column represents one stored source-to-destination edge entry
+
+        - The first row contains source-node indices and the second row contains destination-node indices
+
+    - edge_index used the int64 dtype because it stores node indices rather than feature measurements
+
+    - Both graphs were undirected with reciprocal storage
+
+        - An undirected connection is represented by entries in both directions, such as 0 to 1 and 1 to 0
+
+        - Graph 1 therefore had 19 undirected edges represented by 38 stored entries
+
+        - Graph 2 had 14 undirected edges represented by 28 stored entries
+
+- Inspected edge_attr, which stores the categorical feature associated with each stored edge entry
+
+    - Graph 1 had shape [38, 4] and Graph 2 had shape [28, 4]
+
+        - Each edge_attr row corresponds to the edge_index column at the same position
+
+        - The matching first dimensions therefore confirm one edge-feature row per stored edge entry
+
+    - edge_attr used float32 one-hot vectors
+
+    - Verified the four MUTAG edge-label channels as aromatic, single, double and triple bonds
+
+        - Aromatic, single and double bonds occurred among the distinct rows in both inspected graphs
+
+        - A triple-bond encoding was not observed in these two examples
+
+    - These edge features are inspected so that their meaning is understood, but the principal models will deliberately exclude them while still using edge_index for connectivity
+
+- Inspected y, the graph-level prediction target
+
+    - y had shape [1] and dtype int64 in both graphs, meaning each complete graph has one integer class index
+
+    - Verified that PyG maps the original MUTAG class labels to 0 for non-mutagenic and 1 for mutagenic
+
+        - Graph 1 had y=1 and was therefore a mutagenic example
+
+        - Graph 2 had y=0 and was therefore a non-mutagenic example
+
+    - This graph-level target is different from the categorical node and edge labels, which describe components within the molecule rather than the class to be predicted
+
+- Examined the processed graph connectivity
+
+    - Both inspected graphs used valid node indices, so every stored edge referred to nodes within the corresponding graph
+
+    - Both were reported as undirected with reciprocal edge entries
+
+    - Neither contained self-loops in the processed representation
+
+        - PyG removes self-loops while processing TU datasets, so model layers that require self-connections can add them later according to their own definitions
+
+    - Neither contained duplicate stored edge entries
+
+        - Reciprocal entries are not duplicates because the source and destination are reversed
+
+        - PyG coalesces the TU edge representation during processing, removing repeated directed entries
+
+    - Neither inspected graph contained isolated nodes, so every node in these examples was connected to at least one other node
+
+- Traced the receiving neighbourhood of node 0 directly from edge_index
+
+    - In Graph 1, node 0 had stored incoming edges from nodes 1 and 5
+
+    - In Graph 2, node 0 had stored incoming edges from nodes 1 and 9
+
+    - These entries show how edge_index determines which neighbouring nodes can provide information when a GNN updates node 0
+
+    - Because the graphs use reciprocal undirected storage, these incoming nodes are also node 0's ordinary graph neighbours
+
+- Execution
+
+    - Ran python -m experiments.datasets.inspect_mutag
+
+    - Successfully inspected the shapes, dtypes and selected values of x, edge_index, edge_attr and y for two MUTAG graphs
+
+    - Verified one-hot node and edge encodings and their documented category mappings
+
+    - Verified the graph-target mapping and observed one example from each class
+
+    - Examined reciprocal storage, index validity, self-loops, duplicate entries, isolated nodes and a receiving neighbourhood
+
+    - Full dataset statistics, batching and dataset partitions remain unverified and belong to later Stage 1 work
+
+- Commit: 1.2 inspected MUTAG graph tensors and connectivity
