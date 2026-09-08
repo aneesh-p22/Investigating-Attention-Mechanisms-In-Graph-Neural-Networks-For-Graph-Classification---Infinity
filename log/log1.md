@@ -522,3 +522,191 @@
     - Inspected the original MUTAG graph indices assigned to all three partitions
 
 - Commit: 1.5 added stratified development split and seeding
+
+
+
+
+
+# 1 Closing Notes
+
+- Decisions
+
+    - MUTAG is loaded through PyG's TUDataset using the standard dataset version with cleaned=False
+
+        - Continuous node and edge attributes are not included
+
+        - No transform, pre_transform or pre_filter is applied
+
+        - This input policy is fixed for the principal MUTAG experiments
+
+    - Categorical node features are retained as the seven loaded MUTAG node-label channels
+
+        - The columns represent C, N, O, F, I, Cl and Br
+
+        - These features form the node input x used by the GNNs
+
+    - Edge connectivity is retained through edge_index
+
+        - The four categorical edge-feature channels represent aromatic, single, double and triple bonds
+
+        - edge_attr is inspected and understood but will not be passed into the principal model message-passing layers
+
+        - This is a deliberate project control rather than a limitation of PyG
+
+    - Graph targets use the processed binary labels 0 for non-mutagenic and 1 for mutagenic
+
+    - Graph minibatches use PyG's ordinary disconnected batching representation
+
+        - Nodes and stored edge entries from several graphs are represented together
+
+        - batch records which graph each node belongs to
+
+        - ptr records the node boundaries between graphs
+
+        - No special preprocessing is required to connect graphs because separate graphs remain disconnected inside the minibatch
+
+    - Development minibatches use batch size 32
+
+        - shuffle=False was used only for the Stage 1 inspection so that batching could be read in dataset order
+
+        - Training behaviour is a separate concern and is not fixed by this inspection setting
+
+    - The development partition is stratified by graph class and uses split seed 0
+
+        - The simple class-wise 80/10/10 procedure is retained rather than adding extra splitting infrastructure
+
+        - Integer rounding gives a realised MUTAG split of 150 training, 18 validation and 20 test graphs
+
+        - The unequal validation and test sizes are accepted as the natural result of the simple class-wise integer split
+
+    - Original dataset indices are retained in the development partition
+
+        - The split therefore identifies the exact original MUTAG graphs assigned to training, validation and test
+
+    - Randomness used to choose the development partition is conceptually separate from the random seed used during later model training
+
+        - The development graph membership remains fixed while different models are developed on the same partition
+
+    - Stage 1 inspection code is intentionally straightforward rather than exhaustive
+
+        - Checks and printed values were kept only where they helped understand a scientifically relevant property of the dataset or batching representation
+
+        - Additional sanity checks will not be added routinely unless they are required, appropriate or important enough to remain part of the project
+
+- Ideas
+
+    - Edge features could support a later edge-aware extension if additional work is justified after the core investigation
+
+        - This is not part of the principal model comparison and does not change the current edge-feature exclusion policy
+
+    - The dataset-loading and stratified-splitting functions are written so that datasets with more than two consecutively numbered graph classes can be handled without hard-coding two class lists
+
+        - No additional multi-class dataset is currently part of the core investigation
+
+    - No other optional dataset-processing work is activated from Stage 1
+
+        - The next priority is to understand and implement the first complete graph classifier rather than extending the input pipeline
+
+- Report notes
+
+    - MUTAG contains 188 graph examples and two graph-level classes
+
+        - Class 0 contains 63 graphs
+
+        - Class 1 contains 125 graphs
+
+        - The class distribution is therefore imbalanced, with Class 1 substantially more common than Class 0
+
+    - Each node has seven categorical input channels
+
+        - The channels represent C, N, O, F, I, Cl and Br
+
+        - No additional continuous node attributes are loaded
+
+    - Each stored edge entry has four available categorical feature channels
+
+        - The channels represent aromatic, single, double and triple bonds
+
+        - No additional continuous edge attributes are loaded
+
+        - These edge features are excluded from the principal model inputs while connectivity itself is retained
+
+    - MUTAG graphs vary in size
+
+        - Minimum nodes per graph: 10
+
+        - Mean nodes per graph: 17.93
+
+        - Maximum nodes per graph: 28
+
+    - Stored connectivity also varies by graph
+
+        - Minimum stored edge entries per graph: 20
+
+        - Mean stored edge entries per graph: 39.59
+
+        - Maximum stored edge entries per graph: 66
+
+        - These values should be described as stored edge entries unless reciprocal storage has been established for the specific quantity being converted to undirected edges
+
+    - Feature dimensions were consistent across all 188 graphs
+
+        - Every x matrix had seven columns
+
+        - Every edge_attr matrix had four columns
+
+        - The fixed seven-column node input determines the input width required by the first GNN layer on MUTAG
+
+    - Two representative graphs were inspected directly
+
+        - Graph 1 contained 17 nodes and 38 stored edge entries with graph target 1
+
+        - Graph 2 contained 13 nodes and 28 stored edge entries with graph target 0
+
+        - Both inspected examples had valid node indices, reciprocal undirected storage, no self-loops, no duplicate stored directed entries and no isolated nodes
+
+        - These connectivity observations apply directly to the inspected examples and were not treated as an exhaustive dataset-wide connectivity audit
+
+    - The first inspected minibatch contained 32 graphs
+
+        - The batch contained 585 nodes and 1,304 stored edge entries
+
+        - x had shape [585, 7]
+
+        - edge_index had shape [2, 1304]
+
+        - edge_attr had shape [1304, 4]
+
+        - y had shape [32], giving one graph target per graph
+
+        - batch had one graph-membership value for each of the 585 nodes
+
+        - ptr had 33 boundaries for the 32 graphs and ended at 585
+
+        - Every inspected stored edge remained within one original graph in the batch
+
+    - The development split uses seed 0 and preserves the class structure approximately within each partition
+
+        - Training: 150 graphs with class counts [50, 100]
+
+        - Validation: 18 graphs with class counts [6, 12]
+
+        - Test: 20 graphs with class counts [7, 13]
+
+        - These correspond to approximately 79.8%, 9.6% and 10.6% of the complete dataset
+
+        - The small departure from exact 80/10/10 results from assigning whole graphs after class-wise integer rounding
+
+    - The development partitions have different methodological roles
+
+        - Training graphs are used for parameter optimisation
+
+        - Validation graphs will be used for model-state selection
+
+        - Development test graphs are evaluated after validation-based selection
+
+        - Development results on MUTAG are preliminary engineering evidence because MUTAG is later reused in the locked final cross-validation assessment
+
+    - Evidence available for later Methods and dataset reporting includes the actual loading policy, categorical feature mappings, graph counts, class counts, graph-size statistics, stored edge-entry statistics, feature widths, batching behaviour and fixed development-partition policy
+
+    - Stage 1 notes are factual evidence for later report writing rather than drafted manuscript prose
