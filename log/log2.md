@@ -849,3 +849,471 @@
         - Those questions depend on the validation-selected state implemented in 2.4
 
 - Commit: 2.3 added ordinary fitting and validation
+
+
+
+
+
+# 2.3 Ordinary Fitting and Validation
+
+- Added experiments/train.py to introduce ordinary supervised fitting and validation
+
+    - The complete GCN from 2.1 and 2.2 can now be fitted to labelled MUTAG graphs rather than only inspected with untrained parameters
+
+    - Training uses the development training partition to update model parameters
+
+    - Validation measures the current model after every training epoch without directly updating its parameters
+
+    - The development test partition remains unused in the final 2.3 implementation
+
+        - Test assessment will only be introduced after validation-based model-state selection and restoration are implemented in 2.4
+
+- Kept the training implementation simple while making the natural shared parts suitable for the later GNN models
+
+    - train_epoch receives the model as an argument rather than containing GCN-specific layer operations
+
+    - evaluate also receives the model as an argument
+
+    - Both functions only rely on the common graph-classification interface
+
+        - The model receives x, edge_index and batch
+
+        - The model returns one row of graph-level class logits for every graph in the minibatch
+
+    - GraphSAGE, GIN, GAT and GATv2 are intended to expose the same basic interface
+
+    - The functions remain in experiments/train.py for now because only one model currently uses them
+
+        - Shared training and evaluation modules will be introduced when multiple models create a genuine reuse requirement
+
+        - This avoids both GCN-specific duplication and unnecessary abstraction before it is needed
+
+- Added one settings dictionary containing the choices that define this development fit
+
+    - dataset=MUTAG selects the development dataset
+
+    - baseline_width=64 gives the fixed representation width of the contextual GCN
+
+    - learning_rate=0.01 gives the Adam learning rate
+
+        - The learning rate influences the size of the parameter updates made during optimisation
+
+    - weight_decay=0.0005 gives the fixed Adam weight-decay setting
+
+        - Weight decay discourages excessively large parameter values during optimisation
+
+    - epochs=1000 gives the fixed number of complete training epochs
+
+        - The setting is called epochs rather than max_epochs because the current procedure deliberately completes all 1,000 epochs
+
+        - No patience or early-stopping rule is used
+
+    - batch_size=32 requests up to 32 graphs in each minibatch
+
+    - seed=0 controls stochastic behaviour during model fitting
+
+    - split_seed=0 reproduces the fixed development partition established in Stage 1
+
+    - Ordinary unchanged Adam defaults are left as PyTorch defaults rather than being added to the settings as if they were additional experimental choices
+
+- Added main as the experiment-running part of the file
+
+    - main performs the operations required for this particular development fit
+
+        - It loads MUTAG
+
+        - It obtains the fixed training and validation indices
+
+        - It sets the training seed
+
+        - It creates the DataLoaders
+
+        - It selects the compute device
+
+        - It constructs the GCN
+
+        - It constructs the Adam optimiser
+
+        - It runs all training and validation epochs
+
+    - The __name__ condition calls main when experiments.train is executed as a module
+
+        - This prevents a full training run from beginning merely because the module is imported elsewhere
+
+- Reused load_dataset to load MUTAG consistently with Stage 1
+
+    - The model therefore uses the same 7 loaded categorical node-feature channels previously inspected
+
+    - edge_index continues to provide graph connectivity
+
+    - Edge features remain excluded from the principal model input
+
+- Reused stratified_split to reconstruct the fixed development training and validation partitions
+
+    - train_indices identifies the graphs used for parameter updates
+
+    - val_indices identifies the graphs used for validation
+
+    - The third returned partition is assigned to _ because development-test evaluation does not belong in ordinary fitting and validation
+
+    - split_seed and seed continue to have different purposes
+
+        - split_seed determines which original graphs belong to each development partition
+
+        - seed controls stochastic behaviour during fitting without changing graph membership
+
+- Seeded the stochastic fitting process
+
+    - set_seed seeds the Python, NumPy and PyTorch random-number generators
+
+    - A separate torch.Generator is created for the shuffled training DataLoader
+
+    - manual_seed gives this generator the same training seed
+
+    - Supplying the generator to the DataLoader makes the shuffled training order reproducible
+
+    - Keeping loader shuffling explicitly seeded also avoids making its random sequence depend unnecessarily on how much randomness a particular model consumes during construction
+
+        - This is useful when several GNN models later share the same fitting machinery
+
+- Created separate training and validation DataLoaders
+
+    - The training loader receives dataset[train_indices]
+
+    - batch_size=32 requests up to 32 graphs per training minibatch
+
+    - shuffle=True changes the graph ordering used to form training minibatches across epochs
+
+    - The validation loader receives dataset[val_indices]
+
+    - shuffle=False is used because validation measures the model rather than optimising it
+
+- Confirmed the expected development partition sizes during execution
+
+    - Training graphs: 150
+
+    - Validation graphs: 18
+
+    - These match the Stage 1 development split
+
+- Confirmed the expected minibatch counts
+
+    - Training batches: 5
+
+        - Four full training minibatches contain 32 graphs each
+
+        - The remaining 22 graphs form the fifth minibatch
+
+        - 32 + 32 + 32 + 32 + 22 = 150
+
+    - Validation batches: 1
+
+        - All 18 validation graphs fit into one minibatch because the requested batch size is 32
+
+- Added automatic device selection
+
+    - torch.cuda.is_available checks whether CUDA is available to PyTorch
+
+    - torch.device selects CUDA when it is available and otherwise falls back to CPU
+
+    - model.to(device) moves the model parameters to the selected device
+
+    - graph_batch.to(device) moves the tensors in each PyG minibatch to the same device before model computation
+
+    - Execution reported Device: cuda
+
+        - The 1,000-epoch development fit therefore ran using the available CUDA device
+
+- Created the Adam optimiser
+
+    - model.parameters supplies the trainable tensors registered by the two GCN layers and graph classifier
+
+    - The complete GCN contained 4,802 trainable scalar parameters in 2.2
+
+    - Adam uses gradients of the loss to update these parameter values
+
+    - learning_rate=0.01 and weight_decay=0.0005 are supplied because they are actual project choices
+
+    - The remaining unchanged Adam behaviour uses the ordinary PyTorch defaults
+
+- Added train_epoch for one complete optimisation pass through the training partition
+
+    - One epoch means processing every one of the 150 training graphs once
+
+    - model.train places the model into training mode before processing the minibatches
+
+        - The current GCN does not contain dropout or batch-normalisation layers whose numerical behaviour changes between training and evaluation modes
+
+        - Using the appropriate mode still gives the fitting function the standard PyTorch behaviour required by models where the distinction matters
+
+    - Every graph_batch is moved to the selected device before model operations are performed
+
+- Implemented the ordinary minibatch optimisation sequence explicitly
+
+    - optimizer.zero_grad clears parameter gradients remaining from the previous minibatch
+
+        - PyTorch accumulates gradients by default
+
+        - Clearing them ensures that the following update uses the gradients calculated from the current minibatch rather than unintentionally combining them with previous gradients
+
+    - Calling the model performs the forward pass
+
+        - graph_batch.x supplies node features
+
+        - graph_batch.edge_index supplies graph connectivity
+
+        - graph_batch.batch identifies which graph each node belongs to for sum pooling
+
+        - The complete GCN produces one row of raw class logits for every graph in the minibatch
+
+    - F.cross_entropy compares these logits with graph_batch.y
+
+        - graph_batch.y contains the correct graph-class index for each graph
+
+        - Cross-entropy accepts the raw logits directly, so the model does not apply softmax before calculating the loss
+
+        - The returned value is the mean classification loss across the graphs in the current minibatch
+
+    - loss.backward performs backpropagation
+
+        - PyTorch traces backwards through the operations that produced the loss
+
+        - It calculates a gradient for each trainable parameter describing how the loss locally changes with that parameter
+
+        - backward calculates gradients but does not itself change the model parameters
+
+    - optimizer.step performs the Adam parameter update
+
+        - Adam uses the calculated gradients and its optimiser state to change the trainable parameter values
+
+    - This zero-gradient, forward, loss, backward and update sequence occurs for each of the five training minibatches in every epoch
+
+- Added graph-level predictions and accuracy
+
+    - logits.argmax(dim=1) selects the index of the largest class logit for each graph
+
+    - dim=1 is the class dimension of the graph-by-class output tensor
+
+    - These predicted class indices are compared with graph_batch.y
+
+    - The number of correct predictions is accumulated across all minibatches
+
+    - Accuracy is calculated as the total number of correctly classified graphs divided by the total number of graphs
+
+- Calculated partition loss as a mean over graphs rather than an unweighted mean of minibatch means
+
+    - F.cross_entropy returns the mean loss within the current minibatch
+
+    - The final training minibatch contains only 22 graphs while the preceding minibatches contain 32
+
+    - Giving all five minibatch means equal weight would therefore give each graph in the smaller final minibatch more influence
+
+    - graph_batch.num_graphs gives the number of graphs in the current minibatch
+
+    - loss.item extracts the scalar numerical minibatch loss used for metric reporting
+
+    - Multiplying the minibatch mean by num_graphs gives that minibatch's total contribution to the graph losses
+
+    - These contributions are accumulated across the partition
+
+    - Dividing by total_graphs produces the mean cross-entropy per graph over the complete partition
+
+    - Accuracy follows the same graph-level principle by accumulating correct predictions and total graph counts instead of averaging minibatch accuracies
+
+- Added evaluate for validation
+
+    - evaluate measures loss and accuracy without modifying the model parameters
+
+    - model.eval places the model into evaluation mode
+
+    - torch.no_grad disables gradient tracking while validation calculations are performed
+
+        - Validation does not require backpropagation because it performs no parameter update
+
+        - Avoiding gradient tracking also avoids unnecessary gradient-related computation and storage
+
+    - Validation uses the same model forward pass as training
+
+    - The same cross-entropy definition and graph-level prediction rule are used
+
+        - Training loss and validation loss therefore have the same mathematical meaning
+
+        - Training accuracy and validation accuracy also use the same definition
+
+    - Validation does not call optimizer.zero_grad, loss.backward or optimizer.step
+
+        - The validation graphs therefore measure the current fitted model but do not directly train it
+
+- Added the fixed 1,000-epoch training loop
+
+    - Epoch numbers run from 1 through 1,000
+
+    - train_epoch first performs a complete optimisation pass through the 150 training graphs
+
+    - evaluate then measures the resulting model on the 18 validation graphs
+
+    - Training loss, training accuracy, validation loss and validation accuracy are printed every ten epochs
+
+    - Validation is still calculated after every epoch even though only every tenth set of metrics is printed
+
+        - This distinction will matter in 2.4 when validation loss is used to select a model state
+
+    - No patience or early stopping is used
+
+        - Every fit deliberately completes the same fixed number of epochs
+
+        - 2.4 will select the lowest-validation-loss state from within those epochs rather than using validation to decide when fitting stops
+
+- Ran python -m experiments.train successfully for all 1,000 epochs
+
+    - The run completed without a loading, device, forward-pass, loss, backpropagation, optimiser or validation error
+
+    - The settings printed by the final run were:
+
+        - dataset: MUTAG
+
+        - baseline_width: 64
+
+        - learning_rate: 0.01
+
+        - weight_decay: 0.0005
+
+        - epochs: 1000
+
+        - batch_size: 32
+
+        - seed: 0
+
+        - split_seed: 0
+
+- Training loss generally decreased over the course of fitting
+
+    - At epoch 10, training loss was 0.5014
+
+    - At epoch 100, training loss was 0.3849
+
+    - At epoch 500, training loss was 0.3200
+
+    - At epoch 1,000, training loss was 0.2928
+
+    - The decrease was not monotonic
+
+        - For example, training loss rose to 0.3969 at epoch 210 and to 0.3566 at epoch 480 before falling again
+
+        - Such fluctuations are compatible with minibatch optimisation on shuffled data because each update is based on only part of the training partition
+
+- Training accuracy generally increased compared with the beginning of the run
+
+    - At epoch 10, training accuracy was 0.6867
+
+        - With 150 training graphs, this corresponds to approximately 103 correctly classified training graphs
+
+    - At epoch 100, training accuracy was 0.8400
+
+    - At epoch 500, training accuracy was 0.8733
+
+    - At epoch 1,000, training accuracy was 0.8667
+
+    - The highest training accuracy among the printed ten-epoch checkpoints was 0.9067 at epoch 740
+
+    - Training accuracy also fluctuated rather than increasing at every checkpoint because parameter updates continued throughout the fit
+
+- Validation loss initially improved substantially but later became more variable
+
+    - Validation loss was 0.4496 at epoch 10
+
+    - It had fallen to 0.3296 by epoch 100
+
+    - It was 0.2772 at epoch 200
+
+    - Among the printed ten-epoch checkpoints, the lowest visible validation loss was 0.2633 at epoch 250
+
+    - The printed checkpoints do not establish that epoch 250 was the actual minimum-validation-loss epoch
+
+        - Validation was calculated after every epoch but only every tenth result was printed
+
+        - One of the unprinted epochs may have produced a lower validation loss
+
+        - 2.4 will explicitly track validation loss after every epoch and record the actual selected epoch
+
+- Validation loss later increased while training loss generally remained lower
+
+    - Validation loss was 0.3226 at epoch 540
+
+    - It was 0.3562 at epoch 680
+
+    - It reached 0.3765 at epoch 830
+
+    - It reached 0.3949 at epoch 960
+
+    - It was 0.3354 at epoch 1,000
+
+    - The epoch-1,000 validation loss was therefore substantially higher than the best values visible earlier in training
+
+    - This establishes why simply using the parameter state from the final epoch would not be an appropriate model-selection rule
+
+    - It motivates 2.4, where the lowest-validation-loss state across the fixed 1,000 epochs will be retained and restored
+
+- Validation accuracy was highly discrete because the validation partition contains only 18 graphs
+
+    - Changing the prediction for one validation graph changes accuracy by 1 / 18, approximately 0.0556
+
+    - The frequently observed validation accuracies therefore included:
+
+        - 0.8333, corresponding to 15 correct predictions out of 18
+
+        - 0.8889, corresponding to 16 correct predictions out of 18
+
+        - 0.9444, corresponding to 17 correct predictions out of 18
+
+    - Validation accuracy sometimes changed between these values while validation loss changed in a different direction
+
+        - Accuracy records only whether each final class prediction is correct
+
+        - Cross-entropy also reflects the relative class scores assigned by the model
+
+    - Validation loss will therefore be used for model-state selection rather than choosing whichever epoch happened to have the highest validation accuracy
+
+- The final 2.3 implementation deliberately does not return or report a selected epoch
+
+    - Its purpose is to establish ordinary fitting and validation first
+
+    - The final in-memory model after this substage is simply the state produced after epoch 1,000
+
+    - No claim is made that this final state is the preferred model state
+
+    - 2.4 will add explicit tracking of:
+
+        - the epoch with the lowest validation loss
+
+        - that epoch's validation loss
+
+        - that epoch's validation accuracy
+
+        - a preserved copy of that epoch's model state
+
+    - After all 1,000 epochs have completed, 2.4 will restore that validation-selected state before any development-test assessment
+
+- The 2.3 run establishes that the ordinary supervised GCN fitting path works end to end
+
+    - The fixed development split was reconstructed correctly
+
+    - Training minibatches were shuffled reproducibly
+
+    - The model and graph tensors ran on CUDA
+
+    - Raw graph logits were compared with graph labels using cross-entropy
+
+    - Backpropagation calculated parameter gradients
+
+    - Adam updated the GCN and classifier parameters
+
+    - Training loss and accuracy were calculated over individual graphs
+
+    - Validation loss and accuracy were calculated without parameter updates
+
+    - All 1,000 fixed epochs completed successfully
+
+    - Model-state selection and restoration remain deliberately unimplemented until 2.4
+
+- Commit: 2.3 added ordinary fitting and validation

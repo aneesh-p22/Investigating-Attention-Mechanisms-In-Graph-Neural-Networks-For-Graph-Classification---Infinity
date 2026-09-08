@@ -12,7 +12,7 @@ settings = {
     "baseline_width": 64,
     "learning_rate": 0.01,
     "weight_decay": 0.0005,
-    "max_epochs": 1000,
+    "epochs": 1000,
     "batch_size": 32,
     "seed": 0,
     "split_seed": 0,
@@ -156,7 +156,7 @@ def main():
     print()
     print("Training:")
 
-    for epoch in range(1, settings["max_epochs"] + 1):
+    for epoch in range(1, settings["epochs"] + 1):
         train_loss, train_accuracy = train_epoch(
             model,
             train_loader,
