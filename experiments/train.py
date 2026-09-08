@@ -8,15 +8,16 @@ from torch_geometric.loader import DataLoader
 from src.data import load_dataset, set_seed, stratified_split
 from src.models.gcn import GCN
 from src.recording import (
-    check_result_path,
     get_result_path,
     get_source_commit,
+    prepare_result_path,
     save_result,
 )
 
 
 settings = {
     "model": "GCN",
+    "variant": None,
     "dataset": "MUTAG",
     "baseline_width": 64,
     "learning_rate": 0.01,
@@ -184,7 +185,7 @@ def main():
         result_type,
     )
 
-    check_result_path(result_path)
+    prepare_result_path(result_path)
     source_commit = get_source_commit()
 
     dataset = load_dataset(settings["dataset"])
@@ -244,7 +245,7 @@ def main():
     print(f"Device: {device}")
     print(f"Training graphs: {len(train_indices)}")
     print(f"Validation graphs: {len(val_indices)}")
-    print(f"Test graphs: {len(test_indices)}")
+    print(f"Development test graphs: {len(test_indices)}")
 
     print()
     print("Training:")
@@ -291,8 +292,6 @@ def main():
 
     result = {
         "purpose": result_type,
-        "model": settings["model"],
-        "variant": settings.get("variant"),
         "settings": settings,
         "dataset": {
             "cleaned": False,
@@ -300,9 +299,10 @@ def main():
             "use_edge_attr": False,
         },
         "feature_policy": {
-            "node_features": True,
-            "connectivity": True,
-            "edge_features": False,
+            "node_labels_used": True,
+            "node_attributes_used": False,
+            "connectivity_used": True,
+            "edge_features_used": False,
         },
         "partitions": {
             "train_indices": train_indices,
@@ -332,8 +332,8 @@ def main():
             "convention": (
                 "training pass only; includes loader iteration, "
                 "device transfer, forward pass, loss, backward pass "
-                "and optimiser update; excludes validation, test "
-                "and result writing"
+                "and optimiser update; excludes validation, "
+                "development test and result writing"
             ),
         },
         "device": {
@@ -342,11 +342,6 @@ def main():
         },
         "source_commit": source_commit,
     }
-
-    save_result(
-        result_path,
-        result,
-    )
 
     print()
     print("Selected state:")
@@ -367,6 +362,12 @@ def main():
         f"Mean training seconds per epoch: "
         f"{mean_training_seconds:.4f}"
     )
+
+    save_result(
+        result_path,
+        result,
+    )
+
     print(f"Saved result: {result_path}")
 
 

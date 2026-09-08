@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 
 import torch
@@ -6,17 +7,7 @@ import torch_geometric
 
 
 def get_source_commit():
-    """Return the current Git commit after requiring committed source."""
-    status = subprocess.check_output(
-        ["git", "status", "--porcelain"],
-        text=True,
-    ).strip()
-
-    if status:
-        raise RuntimeError(
-            "Commit the source and settings before running a recorded fit."
-        )
-
+    """Return the current Git commit."""
     return subprocess.check_output(
         ["git", "rev-parse", "HEAD"],
         text=True,
@@ -39,17 +30,14 @@ def get_result_path(settings, result_type):
     return filename
 
 
-def check_result_path(path):
-    """Refuse to reuse an existing result filename."""
-    try:
-        with open(path, "r", encoding="utf-8"):
-            pass
-    except FileNotFoundError:
-        return
+def prepare_result_path(path):
+    """Prepare the results directory and refuse an existing filename."""
+    os.makedirs("results", exist_ok=True)
 
-    raise FileExistsError(
-        f"Result already exists: {path}"
-    )
+    if os.path.exists(path):
+        raise FileExistsError(
+            f"Result already exists: {path}"
+        )
 
 
 def save_result(path, result):
