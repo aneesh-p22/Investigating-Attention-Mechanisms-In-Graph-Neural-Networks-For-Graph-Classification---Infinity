@@ -331,3 +331,103 @@
     - Graph minibatching and development partitioning remain unverified and are handled in the next Stage 1 substages
 
 - Commit: 1.3 recorded MUTAG dataset statistics
+
+
+
+
+
+# 1.4 Graph Minibatching
+
+- Created a PyG DataLoader with batch_size=32 and shuffle=False to inspect how multiple variable-sized graphs are represented together
+
+    - batch_size=32 combines 32 complete graph examples at a time and matches the batch size planned for later experiments
+
+    - shuffle=False preserves dataset order for this inspection so that the first two batched graphs can be compared directly with the graphs already inspected in 1.2
+
+    - Retrieved the first minibatch with next(iter(loader)), giving one PyG Batch containing dataset graphs 0 through 31
+
+- Inspected the combined graph tensors
+
+    - The batch contained 32 graphs with 585 nodes and 1,304 stored edge entries in total
+
+    - x had shape [585, 7]
+
+        - The node rows from all 32 graphs were concatenated into one matrix
+
+        - The total number of nodes increased to 585 while the node-feature width remained seven
+
+    - edge_index had shape [2, 1304] and edge_attr had shape [1304, 4]
+
+        - The connectivity from all 32 graphs was combined into one edge_index
+
+        - The matching first dimension of edge_attr retained one four-channel feature row for each stored edge entry
+
+    - y had shape [32]
+
+        - The individual graph targets were combined into one tensor containing one target for each of the 32 graphs
+
+        - A later graph classifier must correspondingly produce one prediction for each graph in the batch
+
+- Inspected batch, which records graph membership for individual nodes
+
+    - batch had shape [585], giving one graph identifier for each of the 585 concatenated nodes
+
+    - Its first 17 entries were 0 because the first graph contains 17 nodes
+
+    - The following entries were 1 because the second graph begins immediately afterwards
+
+    - This membership information will later allow graph-level pooling to combine node representations separately for each graph
+
+- Inspected ptr, which records the boundaries between graphs in the concatenated node representation
+
+    - ptr contained 33 values for the 32 graphs
+
+        - The additional value is required because each graph is represented by a start and end boundary
+
+    - Its first values were 0, 17 and 30
+
+        - The first graph therefore occupied batched node indices 0 through 16
+
+        - The second graph occupied indices 17 through 29
+
+        - The third graph began at index 30
+
+    - The final ptr value was 585, matching the total number of nodes in the batch
+
+    - batch and ptr therefore describe graph membership in complementary forms: batch identifies the graph for each node, while ptr identifies each graph's node-index range
+
+- Traced how PyG changes local node indices when graphs are combined
+
+    - The second graph followed a 17-node first graph, so its node indices received an offset of 17 inside the batch
+
+    - Its local edge 0 to 1 became batched edge 17 to 18
+
+    - Its local edge 0 to 9 became batched edge 17 to 26
+
+    - This offset prevents node indices from different graphs from referring to the same rows of the combined node-feature matrix while preserving each graph's original connectivity
+
+- Verified that batching did not create connections between separate graphs
+
+    - Looked up the graph membership of every source and destination node in edge_index
+
+    - torch.equal returned True when these memberships were compared
+
+    - Every stored edge therefore started and ended within the same original graph
+
+    - The 32 graphs are represented together as one disconnected batch, allowing message passing to run over the combined tensors without information passing between different molecules
+
+- Execution
+
+    - Ran python -m experiments.datasets.inspect_mutag
+
+    - Observed a 32-graph batch containing 585 nodes and 1,304 stored edge entries
+
+    - Confirmed one graph target per batched graph, one graph-membership value per node and 33 ptr boundaries for 32 graphs
+
+    - Verified the 17-node offset applied to the second graph's local node indices
+
+    - Verified that every stored edge remained within its original graph
+
+    - Development dataset partitioning remains unverified and is handled next
+
+- Commit: 1.4 inspected MUTAG graph minibatching

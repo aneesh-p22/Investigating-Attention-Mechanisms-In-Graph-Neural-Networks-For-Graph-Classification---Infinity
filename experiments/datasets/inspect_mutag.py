@@ -1,5 +1,6 @@
 import torch
 from torch_geometric.datasets import TUDataset
+from torch_geometric.loader import DataLoader
 
 
 dataset = TUDataset(
@@ -128,3 +129,51 @@ print(
 )
 print(f"Node feature widths: {node_feature_widths}")
 print(f"Edge feature widths: {edge_feature_widths}")
+
+
+loader = DataLoader(
+    dataset,
+    batch_size=32,
+    shuffle=False,
+)
+
+batch = next(iter(loader))
+
+print()
+print("Graph minibatch")
+print(batch)
+print(f"Number of graphs: {batch.num_graphs}")
+
+print()
+print("Batched graph tensors")
+print(f"x shape: {batch.x.shape}")
+print(f"edge_index shape: {batch.edge_index.shape}")
+print(f"edge_attr shape: {batch.edge_attr.shape}")
+print(f"y shape: {batch.y.shape}")
+print(f"Graph labels: {batch.y}")
+
+print()
+print("Graph membership")
+print(f"batch shape: {batch.batch.shape}")
+print(f"First 25 batch values: {batch.batch[:25]}")
+print(f"ptr: {batch.ptr}")
+
+print()
+print("Local-to-batch edge indices for Graph 2")
+
+graph_2_edge_mask = batch.batch[batch.edge_index[0]] == 1
+
+print(f"Graph 2 node offset: {batch.ptr[1].item()}")
+print("First five local edge entries:")
+print(dataset[1].edge_index[:, :5])
+print("Same edge entries inside the batch:")
+print(batch.edge_index[:, graph_2_edge_mask][:, :5])
+
+source_graphs = batch.batch[batch.edge_index[0]]
+destination_graphs = batch.batch[batch.edge_index[1]]
+
+print()
+print(
+    "Every stored edge stays within one graph: "
+    f"{torch.equal(source_graphs, destination_graphs)}"
+)
