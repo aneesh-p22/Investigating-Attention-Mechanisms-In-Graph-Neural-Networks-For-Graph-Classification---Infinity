@@ -1,172 +1,129 @@
 # 1.1 Dataset Identity
 
-- Created experiments/datasets/inspect_mutag.py to establish what MUTAG contains before using it for graph classification
+- Loaded MUTAG through PyG's TUDataset using the intended dataset configuration
 
-    - The script loads the dataset, reports its size and available feature information, and retrieves one graph so that its PyG object type can be identified
+    - root="data" stores the downloaded and processed dataset in the local data directory
 
-    - This stage establishes the dataset-level structure only; the tensors stored inside individual graphs are inspected in 1.2
+    - name="MUTAG" selects the MUTAG dataset
 
-- Loaded MUTAG using TUDataset
+    - cleaned=False uses the standard MUTAG version rather than PyG's cleaned variant
 
-    - root set to data stores the downloaded and processed dataset beneath data/MUTAG/
+    - use_node_attr=False and use_edge_attr=False exclude additional continuous node and edge attributes
 
-    - name set to MUTAG selects the MUTAG dataset
+        - These settings do not remove the categorical node and edge labels provided by MUTAG
 
-    - cleaned=False selects the standard dataset rather than the alternative cleaned version in which isomorphic duplicate graphs have been removed
+    - No transform, pre_transform or pre_filter was applied, so the graphs were inspected in the representation loaded by TUDataset
 
-    - use_node_attr=False prevents additional continuous node attributes from being appended to the node-feature matrix
+- Inspected the identity and size of the dataset
 
-        - MUTAG reports zero continuous node attributes, so there are no such values to append in this dataset
+    - The dataset printed as MUTAG(188), meaning 188 graph examples were loaded
 
-        - Its categorical node-label information is still retained and supplies the seven loaded node-feature channels
-
-    - use_edge_attr=False prevents additional continuous edge attributes from being appended to the edge-feature matrix
-
-        - MUTAG reports zero continuous edge attributes
-
-        - Its categorical edge-label information is still retained, which is why four edge-feature channels remain loaded
-
-    - transform=None means no transformation is applied whenever a processed graph is retrieved
-
-    - pre_transform=None means no project-defined transformation is applied once during dataset processing
-
-    - pre_filter=None means no project-defined rule removes graphs during processing
-
-- Established the number of graph examples and prediction classes
-
-    - Printing dataset produced MUTAG(188), while len(dataset) returned 188
-
-        - MUTAG therefore contains 188 separate graph examples
-
-        - Each example is one complete graph with its own nodes, edges, features and graph-level target
-
-        - The value 188 is the number of examples available for later partitioning, not the total number of nodes across the dataset
-
-    - type(dataset) identified the collection as a PyG TUDataset
+    - The dataset object was a torch_geometric.datasets.tu_dataset.TUDataset
 
     - dataset.num_classes returned 2
 
-        - There are two possible graph-level target classes, making MUTAG a binary graph-classification task
+        - MUTAG is therefore a binary graph-classification dataset
 
-        - The eventual classifier will produce two class scores for each whole graph rather than predicting a separate class for each node
+        - Each complete graph is one example assigned to one of two graph-level classes
 
-        - The meaning of the numerical target values themselves has not yet been verified
-
-- Established the node information loaded for each graph
+- Inspected the loaded node information
 
     - dataset.num_node_features returned 7
 
-        - Every loaded node is represented by seven numerical input values
+        - Each node is represented by seven loaded feature values
 
-        - A graph containing N nodes therefore has a node-feature matrix with shape [N, 7]
-
-        - The number of nodes may differ between graphs, while the input feature width remains seven
-
-        - This width will later determine the input dimension of the first GNN layer
+        - A graph containing N nodes therefore has an x matrix with N rows and seven columns
 
     - dataset.num_node_labels returned 7
 
-        - The processed data contains seven channels derived from categorical node labels
-
-        - These labels describe categories of individual nodes and are model inputs, unlike the graph-level target that the model must predict
-
-        - The individual tensor rows and the mapping between channels and real node categories have not yet been inspected
+        - The seven node-feature channels come from categorical node labels
 
     - dataset.num_node_attributes returned 0
 
-        - MUTAG provides no additional continuous numerical node attributes
+        - No additional continuous node attributes are loaded
 
-        - The seven loaded node-feature channels therefore come from its categorical node information rather than additional continuous measurements
-
-- Established the edge information loaded for each graph
+- Inspected the loaded edge information
 
     - dataset.num_edge_features returned 4
 
-        - Every stored edge entry has four associated feature values
-
-        - The value 4 is the width of the edge-feature representation, not the number of edges in a graph or the number of neighbours of a node
+        - Each stored edge entry has four loaded feature values
 
     - dataset.num_edge_labels returned 4
 
-        - The processed data contains four channels derived from categorical edge labels
-
-        - The tensor encoding and the mapping between these channels and real edge categories have not yet been inspected
+        - The four edge-feature channels come from categorical edge labels
 
     - dataset.num_edge_attributes returned 0
 
-        - MUTAG provides no additional continuous numerical edge attributes
+        - No additional continuous edge attributes are loaded
 
-        - use_edge_attr=False therefore does not remove the four categorical edge-label channels
+    - The edge features remain available in the dataset, although the principal GNN models will later use edge_index without passing edge_attr into their message-passing layers
 
-    - The principal models will deliberately ignore these edge features while retaining graph connectivity
+- Inspected an individual dataset item
 
-        - Excluding edge features means their categorical information will not be supplied to the message-passing layers
+    - dataset[0] was a torch_geometric.data.data.Data object
 
-        - It does not remove the edges themselves, since the GNN still requires the connectivity to determine which nodes are neighbours
+    - PyG therefore represents each MUTAG graph as a Data object containing its graph tensors
 
-- Retrieved the first graph using graph = dataset[0]
-
-    - Indexing the dataset selects one complete graph example rather than one node
-
-    - type(graph) identified it as a PyG Data object
-
-        - A Data object stores the tensors describing one graph, including node features, connectivity, optional edge features and the graph-level target
-
-    - The contents of x, edge_index, edge_attr and y, including their shapes, data types and selected values, have not yet been inspected
+    - The contents of those tensors were inspected in 1.2
 
 - Execution
 
     - Ran python -m experiments.datasets.inspect_mutag
 
-    - MUTAG downloaded and processed successfully
+    - Confirmed that 188 MUTAG graphs and two graph classes were loaded
 
-    - Observed 188 graph examples and two graph-level classes
+    - Confirmed seven categorical node-feature channels and four categorical edge-feature channels
 
-    - Observed seven loaded node-feature channels and no continuous node attributes
+    - Confirmed that no additional continuous node or edge attributes were loaded
 
-    - Observed four loaded edge-feature channels and no continuous edge attributes
-
-    - Retrieved the first example as a PyG Data object
-
-    - Stage 1.1 therefore established the dataset identity and the dimensions of the information loaded for nodes and edges
-
-    - Individual tensor contents, categorical encodings, numerical target mappings, graph connectivity, graph sizes, batching and dataset partitions remain unverified
+    - Confirmed that individual graphs are represented as PyG Data objects
 
 - Commit: 1.1 loaded and identified MUTAG
 
 
-
-
-
 # 1.2 Anatomy and Connectivity
 
-- Inspected two individual MUTAG graphs to understand the tensors stored inside each PyG Data object
+- Inspected two individual MUTAG graphs to understand the tensors stored inside a PyG Data object
 
-    - Graph 1 contained 17 nodes and 38 stored edge entries, while Graph 2 contained 13 nodes and 28 stored edge entries
+    - Graph 1 contained 17 nodes and 38 stored edge entries
 
-    - This confirmed that individual graphs can have different numbers of nodes and edges while retaining the same feature dimensions
+    - Graph 2 contained 13 nodes and 28 stored edge entries
+
+    - The different graph sizes show that the number of nodes and connections can vary between molecules
+
+- Recorded the verified meanings of the categorical features
+
+    - The seven node-feature columns represent C, N, O, F, I, Cl and Br
+
+        - These correspond to carbon, nitrogen, oxygen, fluorine, iodine, chlorine and bromine
+
+    - The four edge-feature columns represent aromatic, single, double and triple bonds
+
+    - The processed graph targets use 0 for non-mutagenic and 1 for mutagenic
+
+    - Recording these mappings makes the one-hot feature tensors directly interpretable rather than treating the columns as unnamed categories
 
 - Inspected x, the node-feature matrix
 
     - Graph 1 had shape [17, 7] and Graph 2 had shape [13, 7]
 
-        - Each row represents one node and the seven columns represent the seven possible categorical node types
+        - Each row represents one node
 
-        - The first dimension therefore changes with the number of nodes, while the feature width remains seven for every graph
+        - Each column represents one of the seven categorical atom types
 
-    - x used the float32 dtype and its observed rows were one-hot vectors
+        - The number of rows changes with graph size while the feature width remains seven
 
-        - A one-hot vector has one active value of 1, with its position identifying the node category
+    - x used the float32 dtype
 
-        - The floating-point representation allows the categorical values to be used as neural-network inputs; it does not make them continuous measurements
+        - The values are stored as floating-point inputs for neural-network operations but represent categorical atom types rather than continuous measurements
 
-    - Verified the MUTAG node-label mapping from the dataset documentation
+    - The distinct x rows observed in both graphs were one-hot encodings
 
-        - The seven channels represent C, N, O, F, I, Cl and Br respectively
+        - A one-hot encoding contains one value of 1 and zeros in the remaining positions
 
-        - Both inspected graphs contained C, N and O among their observed node-feature rows
+        - The position containing 1 identifies the atom type using the recorded column ordering
 
-        - The first five nodes in both graphs were represented by the carbon channel
+    - Carbon, nitrogen and oxygen occurred among the distinct node-feature rows in both inspected graphs
 
 - Inspected edge_index, which stores graph connectivity
 
@@ -174,260 +131,394 @@
 
         - Each column represents one stored source-to-destination edge entry
 
-        - The first row contains source-node indices and the second row contains destination-node indices
+        - The first row contains source-node indices
 
-    - edge_index used the int64 dtype because it stores node indices rather than feature measurements
+        - The second row contains destination-node indices
 
-    - Both graphs were undirected with reciprocal storage
-
-        - An undirected connection is represented by entries in both directions, such as 0 to 1 and 1 to 0
-
-        - Graph 1 therefore had 19 undirected edges represented by 38 stored entries
-
-        - Graph 2 had 14 undirected edges represented by 28 stored entries
+    - edge_index used the int64 dtype because its values are node indices
 
 - Inspected edge_attr, which stores the categorical feature associated with each stored edge entry
 
     - Graph 1 had shape [38, 4] and Graph 2 had shape [28, 4]
 
-        - Each edge_attr row corresponds to the edge_index column at the same position
+        - edge_attr therefore contains one row for every stored edge_index column
 
-        - The matching first dimensions therefore confirm one edge-feature row per stored edge entry
+        - Each row has four columns representing the possible bond categories
 
-    - edge_attr used float32 one-hot vectors
+    - edge_attr used the float32 dtype
 
-    - Verified the four MUTAG edge-label channels as aromatic, single, double and triple bonds
+    - Its distinct rows were one-hot encodings using the aromatic, single, double and triple column ordering
 
-        - Aromatic, single and double bonds occurred among the distinct rows in both inspected graphs
+    - Aromatic, single and double bond encodings occurred in both inspected graphs
 
-        - A triple-bond encoding was not observed in these two examples
+    - A triple-bond encoding was not observed in these two examples
 
-    - These edge features are inspected so that their meaning is understood, but the principal models will deliberately exclude them while still using edge_index for connectivity
+- Inspected y, the graph-level target
 
-- Inspected y, the graph-level prediction target
+    - y had shape [1] and dtype int64 for each graph
 
-    - y had shape [1] and dtype int64 in both graphs, meaning each complete graph has one integer class index
+        - The one value is a target for the complete graph rather than for an individual node or edge
 
-    - Verified that PyG maps the original MUTAG class labels to 0 for non-mutagenic and 1 for mutagenic
+    - Graph 1 had target 1 and was therefore a mutagenic example
 
-        - Graph 1 had y=1 and was therefore a mutagenic example
+    - Graph 2 had target 0 and was therefore a non-mutagenic example
 
-        - Graph 2 had y=0 and was therefore a non-mutagenic example
+    - The Data summary reports tensor shapes rather than tensor contents
 
-    - This graph-level target is different from the categorical node and edge labels, which describe components within the molecule rather than the class to be predicted
+        - For example, y=[1] in the Data summary means that y has one element and does not mean that its target value is necessarily 1
 
-- Examined the processed graph connectivity
+- Examined the connectivity representation of both graphs
 
-    - Both inspected graphs used valid node indices, so every stored edge referred to nodes within the corresponding graph
+    - Checked that every value in edge_index was at least 0 and smaller than graph.num_nodes
 
-    - Both were reported as undirected with reciprocal edge entries
+        - Valid node indices returned True for both inspected graphs
 
-    - Neither contained self-loops in the processed representation
+        - Every stored edge therefore referred to nodes that exist within its graph
 
-        - PyG removes self-loops while processing TU datasets, so model layers that require self-connections can add them later according to their own definitions
+    - graph.is_undirected() returned True for both graphs
 
-    - Neither contained duplicate stored edge entries
+        - The undirected connections are stored reciprocally, with one source-to-destination entry in each direction
 
-        - Reciprocal entries are not duplicates because the source and destination are reversed
+    - graph.has_self_loops() returned False for both graphs
 
-        - PyG coalesces the TU edge representation during processing, removing repeated directed entries
+        - Neither inspected graph contained a stored edge from a node to itself
 
-    - Neither inspected graph contained isolated nodes, so every node in these examples was connected to at least one other node
+    - Used torch.unique over the columns of edge_index to check for repeated stored directed entries
 
-- Traced the receiving neighbourhood of node 0 directly from edge_index
+        - Neither inspected graph contained duplicate stored edge entries
 
-    - In Graph 1, node 0 had stored incoming edges from nodes 1 and 5
+        - Reciprocal entries are not duplicates because their source and destination positions are reversed
 
-    - In Graph 2, node 0 had stored incoming edges from nodes 1 and 9
+    - graph.has_isolated_nodes() returned False for both graphs
 
-    - These entries show how edge_index determines which neighbouring nodes can provide information when a GNN updates node 0
+        - Every node in these two examples was connected to at least one other node
 
-    - Because the graphs use reciprocal undirected storage, these incoming nodes are also node 0's ordinary graph neighbours
+    - Because the inspected graphs used reciprocal storage and contained no self-loops or duplicate entries, Graph 1's 38 stored entries represented 19 undirected connections and Graph 2's 28 stored entries represented 14
+
+        - This conclusion applies to the two inspected examples rather than assuming that the same properties have been exhaustively checked for every graph
+
+- Traced one receiving neighbourhood using node 0
+
+    - Compared the destination row of edge_index with node 0 to create a Boolean incoming_mask
+
+        - True positions identify stored edges whose destination is node 0
+
+    - Applying the mask to edge_index selected the complete stored edge entries into node 0
+
+    - Graph 1 had incoming entries from nodes 1 and 5
+
+    - Graph 2 had incoming entries from nodes 1 and 9
+
+    - This provides a concrete example of how edge_index identifies neighbouring source nodes that can provide information to a destination node during message passing
 
 - Execution
 
     - Ran python -m experiments.datasets.inspect_mutag
 
-    - Successfully inspected the shapes, dtypes and selected values of x, edge_index, edge_attr and y for two MUTAG graphs
+    - Inspected the shapes, dtypes and categorical encodings of x, edge_index, edge_attr and y for two graphs
 
-    - Verified one-hot node and edge encodings and their documented category mappings
+    - Recorded the verified atom, bond and graph-target mappings
 
-    - Verified the graph-target mapping and observed one example from each class
+    - Checked node-index bounds, reciprocal storage, self-loops, duplicate entries and isolated nodes
 
-    - Examined reciprocal storage, index validity, self-loops, duplicate entries, isolated nodes and a receiving neighbourhood
-
-    - Full dataset statistics, batching and dataset partitions remain unverified and belong to later Stage 1 work
+    - Traced one receiving neighbourhood directly from edge_index
 
 - Commit: 1.2 inspected MUTAG graph tensors and connectivity
 
 
-
-
-
 # 1.3 Dataset Statistics
 
-- Extended experiments/datasets/inspect_mutag.py with a short loop over all 188 graphs to establish dataset-wide class counts, graph sizes and feature dimensions
+- Extended the inspection from two representative graphs to all 188 MUTAG graphs
 
-    - The loop records only the information required for the summary rather than printing or individually inspecting every graph
+    - Iterated through the complete dataset and collected graph-class counts, node counts, stored edge-entry counts and feature widths
 
-- Counted the graph-level target classes using graph.y.item()
+- Counted the graph-level classes
 
-    - Observed 63 graphs with class 0 and 125 graphs with class 1, accounting for all 188 examples
+    - Class 0 contained 63 graphs
 
-    - MUTAG is therefore class-imbalanced, with class 1 occurring almost twice as often as class 0
+    - Class 1 contained 125 graphs
 
-    - This matters for later dataset partitioning because small random partitions could otherwise contain distorted class proportions
+    - The counts sum to the full 188 graph examples
 
-    - The agreed development partition will therefore use stratification so that each partition retains the class distribution as closely as its integer size permits
+    - Class 1 is therefore substantially more common than Class 0
 
-- Recorded the number of nodes in every graph using graph.num_nodes
+    - This makes preserving the class distribution important when the development split is created, but does not by itself justify changing the loss function or rebalancing the dataset
 
-    - Observed a minimum of 10 nodes, a mean of 17.93 and a maximum of 28
+- Measured the number of nodes per graph
 
-    - Graph size therefore varies across MUTAG rather than every example containing the same number of nodes
+    - Minimum: 10 nodes
 
-    - The model must handle this variable number of nodes while accepting the same feature width for each node
+    - Mean: 17.93 nodes
 
-    - Larger graphs also require more node representations and message-passing operations, so graph size contributes to computational cost
+    - Maximum: 28 nodes
 
-- Recorded graph.num_edges for every graph
+    - MUTAG therefore contains relatively small graphs, but their number of nodes is not fixed
 
-    - Observed between 20 and 66 stored edge entries per graph, with a mean of 39.59
+    - A GNN must consequently process graphs with different numbers of node rows while using the same feature width
 
-    - These values describe the number of entries stored in edge_index rather than a separately verified dataset-wide count of undirected molecular edges
+- Measured the number of stored edge entries per graph
 
-    - Reciprocal undirected storage was established for the two graphs inspected in 1.2, but this statistics loop did not repeat that connectivity test across every graph
+    - Minimum: 20 stored edge entries
 
-- Established node-feature consistency across the dataset
+    - Mean: 39.59 stored edge entries
 
-    - Added graph.x.shape[1] from every graph to a set and obtained {7}
+    - Maximum: 66 stored edge entries
 
-    - A set retains each different value only once, so this establishes that all 188 graphs have seven node-feature columns
+    - The amount of stored connectivity therefore also varies between graphs
 
-    - Graphs therefore have node-feature matrices of shape [N, 7], where N varies with graph size but the feature width remains fixed
+    - These values are kept as stored edge-entry counts rather than automatically dividing them by two
 
-    - This consistent width allows the same first GNN layer to process every graph and determines its input width as seven
+        - Reciprocal storage, self-loops and duplicates were inspected for the two representative graphs in 1.2 but were not exhaustively checked across all 188 graphs
 
-- Established edge-feature consistency across the dataset
+- Checked the node-feature width across the complete dataset
 
-    - Added graph.edge_attr.shape[1] from every graph to a set and obtained {4}
+    - node_feature_widths was a Python set
 
-    - Every MUTAG graph therefore has four edge-feature columns
+        - A set stores each distinct value only once
 
-    - These categorical edge features remain consistently represented even though the principal models will deliberately exclude them from their inputs
+        - Adding graph.x.shape[1] for every graph therefore provides a compact way to see whether more than one node-feature width occurs
+
+    - The resulting set was {7}
+
+        - Every MUTAG graph therefore had seven columns in x
+
+        - The later GNNs can use one fixed input feature dimension even though their numbers of nodes vary
+
+- Checked the edge-feature width across the complete dataset
+
+    - The resulting edge_feature_widths set was {4}
+
+        - Every graph had four columns in edge_attr
+
+        - The edge-feature width is therefore consistent across the complete dataset
 
 - Execution
 
     - Ran python -m experiments.datasets.inspect_mutag
 
-    - Observed class counts of 63 for class 0 and 125 for class 1
+    - Confirmed class counts of 63 and 125
 
-    - Observed 10 to 28 nodes per graph with a mean of 17.93
+    - Observed graph sizes from 10 to 28 nodes with a mean of 17.93
 
     - Observed 20 to 66 stored edge entries per graph with a mean of 39.59
 
-    - Confirmed a node-feature width of seven and an edge-feature width of four across all 188 graphs
-
-    - Graph minibatching and development partitioning remain unverified and are handled in the next Stage 1 substages
+    - Confirmed consistent node and edge feature widths of seven and four across all 188 graphs
 
 - Commit: 1.3 recorded MUTAG dataset statistics
 
 
-
-
-
 # 1.4 Graph Minibatching
 
-- Created a PyG DataLoader with batch_size=32 and shuffle=False to inspect how multiple variable-sized graphs are represented together
+- Created a PyG DataLoader with batch_size=32 to inspect how multiple graph examples are represented together
 
-    - batch_size=32 combines 32 complete graph examples at a time and matches the batch size planned for later experiments
+    - batch_size=32 combines 32 complete graph examples into one minibatch
 
-    - shuffle=False preserves dataset order for this inspection so that the first two batched graphs can be compared directly with the graphs already inspected in 1.2
+    - shuffle=False was used for this inspection so that the batch remained in dataset order
 
-    - Retrieved the first minibatch with next(iter(loader)), giving one PyG Batch containing dataset graphs 0 through 31
+        - The purpose here was to understand the batch representation rather than reproduce the shuffled ordering that will later be used during training
+
+- Retrieved the first graph minibatch
+
+    - The batch contained 32 graphs
+
+    - Across those graphs there were 585 nodes and 1,304 stored edge entries
 
 - Inspected the combined graph tensors
 
-    - The batch contained 32 graphs with 585 nodes and 1,304 stored edge entries in total
-
     - x had shape [585, 7]
 
-        - The node rows from all 32 graphs were concatenated into one matrix
+        - Node-feature rows from the 32 graphs were concatenated into one larger matrix
 
-        - The total number of nodes increased to 585 while the node-feature width remained seven
+        - The node-feature width remained seven
 
-    - edge_index had shape [2, 1304] and edge_attr had shape [1304, 4]
+    - edge_index had shape [2, 1304]
 
-        - The connectivity from all 32 graphs was combined into one edge_index
+        - The stored connectivity from all 32 graphs was represented in one edge-index tensor
 
-        - The matching first dimension of edge_attr retained one four-channel feature row for each stored edge entry
+    - edge_attr had shape [1304, 4]
+
+        - There remained one four-channel edge-feature row for every stored edge entry
 
     - y had shape [32]
 
         - The individual graph targets were combined into one tensor containing one target for each of the 32 graphs
 
-        - A later graph classifier must correspondingly produce one prediction for each graph in the batch
+        - A later graph classifier must therefore produce one graph-level prediction for each graph in the minibatch
 
-- Inspected batch, which records graph membership for individual nodes
+- Inspected graph_batch.batch, which records graph membership for individual nodes
 
-    - batch had shape [585], giving one graph identifier for each of the 585 concatenated nodes
+    - graph_batch.batch had shape [585]
 
-    - Its first 17 entries were 0 because the first graph contains 17 nodes
+        - There is one graph identifier for each of the 585 nodes in the combined x matrix
 
-    - The following entries were 1 because the second graph begins immediately afterwards
+        - Nodes belonging to the same original graph receive the same graph identifier
 
-    - This membership information will later allow graph-level pooling to combine node representations separately for each graph
+    - This membership information will later allow graph-level pooling to determine which node representations belong to each graph
 
-- Inspected ptr, which records the boundaries between graphs in the concatenated node representation
+- Inspected graph_batch.ptr, which stores the node boundaries between graphs
 
-    - ptr contained 33 values for the 32 graphs
+    - ptr contained 33 values for 32 graphs
 
-        - The additional value is required because each graph is represented by a start and end boundary
+        - The extra value is required because the sequence records both graph starts and the final ending position
 
-    - Its first values were 0, 17 and 30
+    - The first values were 0, 17 and 30
 
-        - The first graph therefore occupied batched node indices 0 through 16
+        - The first graph occupied node positions 0 through 16 in the combined batch
 
-        - The second graph occupied indices 17 through 29
+        - The second graph occupied positions 17 through 29
 
-        - The third graph began at index 30
+        - The third graph began at position 30
 
     - The final ptr value was 585, matching the total number of nodes in the batch
 
-    - batch and ptr therefore describe graph membership in complementary forms: batch identifies the graph for each node, while ptr identifies each graph's node-index range
+    - ptr also makes the relationship between local graph indices and combined batch positions understandable
 
-- Traced how PyG changes local node indices when graphs are combined
+        - Each original graph numbers its own nodes starting locally from 0
 
-    - The second graph followed a 17-node first graph, so its node indices received an offset of 17 inside the batch
+        - When the graphs are combined, later graphs occupy positions after all nodes belonging to earlier graphs
 
-    - Its local edge 0 to 1 became batched edge 17 to 18
+        - For example, the second graph begins at position 17 because the first graph contains 17 nodes
 
-    - Its local edge 0 to 9 became batched edge 17 to 26
+- Verified that batching did not connect separate graphs
 
-    - This offset prevents node indices from different graphs from referring to the same rows of the combined node-feature matrix while preserving each graph's original connectivity
+    - Used graph_batch.batch to find the graph identifier associated with every source node in edge_index
 
-- Verified that batching did not create connections between separate graphs
+        - These values were stored as source_graph_ids
 
-    - Looked up the graph membership of every source and destination node in edge_index
+    - Did the same for every destination node and stored the values as destination_graph_ids
 
-    - torch.equal returned True when these memberships were compared
+    - torch.equal returned True when the source and destination graph identifiers were compared
 
-    - Every stored edge therefore started and ended within the same original graph
+        - Every stored edge therefore started and ended within the same original graph
 
-    - The 32 graphs are represented together as one disconnected batch, allowing message passing to run over the combined tensors without information passing between different molecules
+        - The minibatch behaves as a disconnected collection of graphs rather than introducing connections between different molecules
+
+- Related the batch representation to later GNN processing
+
+    - Message-passing layers can process the combined node and edge tensors while information remains confined to each original graph because there are no cross-graph edges
+
+    - graph_batch.batch later tells global graph pooling which node representations should be combined together
+
+    - The node representations can therefore be reduced back into 32 separate graph representations before graph classification
 
 - Execution
 
     - Ran python -m experiments.datasets.inspect_mutag
 
-    - Observed a 32-graph batch containing 585 nodes and 1,304 stored edge entries
+    - Inspected a 32-graph minibatch containing 585 nodes and 1,304 stored edge entries
 
-    - Confirmed one graph target per batched graph, one graph-membership value per node and 33 ptr boundaries for 32 graphs
+    - Confirmed one graph target for each graph and one graph-membership value for each node
 
-    - Verified the 17-node offset applied to the second graph's local node indices
+    - Used ptr to understand the boundaries between graphs in the combined node representation
 
     - Verified that every stored edge remained within its original graph
 
-    - Development dataset partitioning remains unverified and is handled next
-
 - Commit: 1.4 inspected MUTAG graph minibatching
+
+
+
+
+
+# 1.5 Development Split and Seeding
+
+- Moved the common TU dataset loading configuration into load_dataset in src/data.py
+
+    - load_dataset takes the dataset name and applies the same TUDataset settings previously written directly in inspect_mutag.py
+
+    - inspect_mutag.py now loads MUTAG with load_dataset("MUTAG")
+
+    - Re-running the full inspection produced the same MUTAG identity, graph representations, dataset statistics and minibatch results as before, confirming that the loading behaviour had not changed
+
+- Added set_seed for controlling randomness during later experiments
+
+    - random.seed sets Python's random state
+
+    - np.random.seed sets NumPy's random state
+
+    - torch.manual_seed sets PyTorch's random state
+
+    - These will later allow model runs using the same training seed to begin from controlled random states
+
+    - The development split uses its own split seed separately, so constructing the partition does not depend on calling set_seed first
+
+- Added stratified_split to create the fixed development train, validation and test partitions
+
+    - The function first creates one list of graph indices for each graph class
+
+    - enumerate(dataset) provides each graph together with its original dataset index
+
+    - graph.y.item() identifies the graph's class, allowing its original index to be added to the corresponding class list
+
+    - Splitting the classes separately makes the partition stratified rather than randomly splitting all graphs together without regard to their targets
+
+- Used random.Random(seed) to create a local random generator for the partition
+
+    - rng.shuffle randomly changes the ordering of the indices within each class before they are divided
+
+    - Using split seed 0 makes the selected development graph membership reproducible
+
+    - The original graph indices are retained, so the split records exactly which MUTAG examples belong to each partition
+
+- Divided each class approximately 80/10/10 using integer boundaries
+
+    - train_end takes the first approximately 80% of each shuffled class for training
+
+    - val_end then gives approximately the next 10% to validation
+
+    - The remaining graphs are assigned to test
+
+    - Integer graph counts mean the realised percentages do not have to be exactly 80%, 10% and 10%
+
+- Inspected the realised MUTAG development split
+
+    - Training contained 150 graphs
+
+        - 50 were Class 0 and 100 were Class 1
+
+    - Validation contained 18 graphs
+
+        - 6 were Class 0 and 12 were Class 1
+
+    - Test contained 20 graphs
+
+        - 7 were Class 0 and 13 were Class 1
+
+    - The complete dataset contains 63 Class 0 and 125 Class 1 graphs, so the three partitions retained a similar class distribution
+
+    - The 150/18/20 sizes correspond to approximately 79.8% training, 9.6% validation and 10.6% test
+
+        - The small difference from exact 80/10/10 is caused by converting the class-wise proportions to whole numbers of graphs
+
+        - No adjustment was made simply to force validation and test to have identical sizes
+
+- Printed the original graph indices belonging to each partition
+
+    - The lists identify which examples from the original MUTAG dataset were selected for training, validation and test
+
+    - These exact index lists can be reproduced from the same dataset using split seed 0
+
+    - The full index lists were inspected in the program output but do not need to be duplicated in the log
+
+- Established the role of each development partition
+
+    - Training graphs will later be used to update model parameters
+
+    - Validation graphs will be kept separate from parameter updates and used for model-state selection during development
+
+    - Test graphs will remain separate from both training and validation and will be evaluated after the validation-selected state has been chosen
+
+    - This development test partition provides preliminary engineering evidence rather than the final cross-validation results used for the main experimental conclusions
+
+- Execution
+
+    - Ran python -m experiments.datasets.inspect_mutag
+
+    - Confirmed a reproducible stratified development split using seed 0
+
+    - Observed 150 training, 18 validation and 20 test graphs
+
+    - Observed class allocations of [50, 100], [6, 12] and [7, 13] respectively
+
+    - Inspected the original MUTAG graph indices assigned to all three partitions
+
+- Commit: 1.5 added stratified development split and seeding

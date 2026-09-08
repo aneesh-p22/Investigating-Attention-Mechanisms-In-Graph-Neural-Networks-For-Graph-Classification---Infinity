@@ -1,18 +1,10 @@
 import torch
-from torch_geometric.datasets import TUDataset
 from torch_geometric.loader import DataLoader
 
+from src.data import load_dataset, stratified_split
 
-dataset = TUDataset(
-    root="data",
-    name="MUTAG",
-    cleaned=False,
-    use_node_attr=False,
-    use_edge_attr=False,
-    transform=None,
-    pre_transform=None,
-    pre_filter=None,
-)
+
+dataset = load_dataset("MUTAG")
 
 print(f"Dataset: {dataset}")
 print(f"Dataset type: {type(dataset)}")
@@ -30,6 +22,13 @@ print()
 print(f"Loaded edge features: {dataset.num_edge_features}")
 print(f"Edge label channels: {dataset.num_edge_labels}")
 print(f"Available continuous edge attributes: {dataset.num_edge_attributes}")
+
+print()
+
+print("Feature meanings")
+print("Node feature columns: C, N, O, F, I, Cl, Br")
+print("Edge feature columns: aromatic, single, double, triple")
+print("Graph targets: 0 = non-mutagenic, 1 = mutagenic")
 
 graph_1 = dataset[0]
 graph_2 = dataset[1]
@@ -49,8 +48,6 @@ for graph_number, graph in [(1, graph_1), (2, graph_2)]:
     print("x - node features")
     print(f"Shape: {graph.x.shape}")
     print(f"Dtype: {graph.x.dtype}")
-    print("First five rows:")
-    print(graph.x[:5])
     print("Distinct rows:")
     print(graph.x.unique(dim=0))
 
@@ -58,15 +55,11 @@ for graph_number, graph in [(1, graph_1), (2, graph_2)]:
     print("edge_index - connectivity")
     print(f"Shape: {graph.edge_index.shape}")
     print(f"Dtype: {graph.edge_index.dtype}")
-    print("First ten stored edge entries:")
-    print(graph.edge_index[:, :10])
 
     print()
     print("edge_attr - edge features")
     print(f"Shape: {graph.edge_attr.shape}")
     print(f"Dtype: {graph.edge_attr.dtype}")
-    print("First ten rows:")
-    print(graph.edge_attr[:10])
     print("Distinct rows:")
     print(graph.edge_attr.unique(dim=0))
 
@@ -79,25 +72,26 @@ for graph_number, graph in [(1, graph_1), (2, graph_2)]:
     edge_index = graph.edge_index
     unique_edges = torch.unique(edge_index, dim=1)
 
-    valid_indices = (
+    node_indices_valid = (
         edge_index.min().item() >= 0
         and edge_index.max().item() < graph.num_nodes
     )
-    duplicate_entries = unique_edges.shape[1] != edge_index.shape[1]
+    has_duplicate_entries = unique_edges.shape[1] != edge_index.shape[1]
 
     print()
     print("Connectivity")
-    print(f"Valid node indices: {valid_indices}")
+    print(f"Valid node indices: {node_indices_valid}")
     print(f"Undirected with reciprocal edge entries: {graph.is_undirected()}")
     print(f"Contains self-loops: {graph.has_self_loops()}")
-    print(f"Contains duplicate stored edge entries: {duplicate_entries}")
+    print(f"Contains duplicate stored edge entries: {has_duplicate_entries}")
     print(f"Contains isolated nodes: {graph.has_isolated_nodes()}")
 
     node = 0
     incoming_mask = edge_index[1] == node
-    neighbours = edge_index[0, incoming_mask]
+    edges_into_node = edge_index[:, incoming_mask]
 
-    print(f"Nodes with stored edges into node {node}: {neighbours}")
+    print(f"Stored edge entries into node {node}:")
+    print(edges_into_node)
 
 class_counts = [0] * dataset.num_classes
 node_counts = []
@@ -130,50 +124,65 @@ print(
 print(f"Node feature widths: {node_feature_widths}")
 print(f"Edge feature widths: {edge_feature_widths}")
 
-
 loader = DataLoader(
     dataset,
     batch_size=32,
     shuffle=False,
 )
 
-batch = next(iter(loader))
+graph_batch = next(iter(loader))
 
 print()
 print("Graph minibatch")
-print(batch)
-print(f"Number of graphs: {batch.num_graphs}")
+print(f"Batch type: {type(graph_batch)}")
+print(f"Number of graphs: {graph_batch.num_graphs}")
 
 print()
 print("Batched graph tensors")
-print(f"x shape: {batch.x.shape}")
-print(f"edge_index shape: {batch.edge_index.shape}")
-print(f"edge_attr shape: {batch.edge_attr.shape}")
-print(f"y shape: {batch.y.shape}")
-print(f"Graph labels: {batch.y}")
+print(f"x shape: {graph_batch.x.shape}")
+print(f"edge_index shape: {graph_batch.edge_index.shape}")
+print(f"edge_attr shape: {graph_batch.edge_attr.shape}")
+print(f"y shape: {graph_batch.y.shape}")
+print(f"Graph labels: {graph_batch.y}")
 
 print()
 print("Graph membership")
-print(f"batch shape: {batch.batch.shape}")
-print(f"First 25 batch values: {batch.batch[:25]}")
-print(f"ptr: {batch.ptr}")
+print(f"batch shape: {graph_batch.batch.shape}")
+print(f"Graph IDs in batch: {graph_batch.batch.unique()}")
+print(f"ptr: {graph_batch.ptr}")
 
-print()
-print("Local-to-batch edge indices for Graph 2")
-
-graph_2_edge_mask = batch.batch[batch.edge_index[0]] == 1
-
-print(f"Graph 2 node offset: {batch.ptr[1].item()}")
-print("First five local edge entries:")
-print(dataset[1].edge_index[:, :5])
-print("Same edge entries inside the batch:")
-print(batch.edge_index[:, graph_2_edge_mask][:, :5])
-
-source_graphs = batch.batch[batch.edge_index[0]]
-destination_graphs = batch.batch[batch.edge_index[1]]
+source_graph_ids = graph_batch.batch[graph_batch.edge_index[0]]
+destination_graph_ids = graph_batch.batch[graph_batch.edge_index[1]]
 
 print()
 print(
     "Every stored edge stays within one graph: "
-    f"{torch.equal(source_graphs, destination_graphs)}"
+    f"{torch.equal(source_graph_ids, destination_graph_ids)}"
 )
+
+
+split_seed = 0
+
+train_indices, val_indices, test_indices = stratified_split(
+    dataset,
+    split_seed,
+)
+
+print()
+print("Development split")
+print(f"Split seed: {split_seed}")
+
+for split_name, split_indices in [
+    ("Train", train_indices),
+    ("Validation", val_indices),
+    ("Test", test_indices),
+]:
+    split_class_counts = [0] * dataset.num_classes
+
+    for index in split_indices:
+        split_class_counts[dataset[index].y.item()] += 1
+
+    print()
+    print(f"{split_name} graphs: {len(split_indices)}")
+    print(f"{split_name} class counts: {split_class_counts}")
+    print(f"{split_name} indices: {split_indices}")
