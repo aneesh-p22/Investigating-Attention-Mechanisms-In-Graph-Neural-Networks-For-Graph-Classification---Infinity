@@ -225,3 +225,63 @@
     - All specified requirements were already satisfied in .venv
 
     - Package layout creation and the README development-status update are pending confirmation
+
+
+
+
+
+# 0.4 Empty LaTeX Skeleton and Verified References
+
+- Prepared the report source files
+
+    - report/main.tex defines the report structure
+
+    - report/references.bib stores bibliographic records
+
+    - The repository will retain the current report source files
+
+- Defined the empty report structure
+
+    - Used the article document class with 11-point text and A4 paper
+
+    - Included Abstract, Introduction, Background and Related Work, Methodology, Results, Discussion, Limitations and Conclusion
+
+    - Substantive report writing remains scheduled for the dedicated report phase
+
+- Selected the LaTeX packages
+
+    - amsmath provides mathematical typesetting tools
+
+    - graphicx supports figures
+
+    - booktabs supports table rules
+
+    - natbib provides citations, with numerical citation formatting selected
+
+- Prepared two verified bibliography entries
+
+    - Semi-Supervised Classification with Graph Convolutional Networks, by Thomas N. Kipf and Max Welling, ICLR 2017
+
+    - Graph Attention Networks, by Petar Veličković, Guillem Cucurull, Arantxa Casanova, Adriana Romero, Pietro Liò and Yoshua Bengio, ICLR 2018
+
+    - Titles, author order and publication years were checked against the supplied papers and primary records
+
+- Explained bibliography handling
+
+    - Citation keys identify records in references.bib
+
+    - citep inserts a citation into manuscript text
+
+    - A temporary nocite command includes the two references in the empty skeleton
+
+    - The unsrtnat bibliography style formats references in citation order
+
+- Selected Overleaf for compilation
+
+    - Compilation converts the LaTeX source into a PDF
+
+    - Changes made in Overleaf must also be saved in the repository copies
+
+- Execution
+
+    - File creation, compilation and inspection of the resulting PDF are pending confirmation
