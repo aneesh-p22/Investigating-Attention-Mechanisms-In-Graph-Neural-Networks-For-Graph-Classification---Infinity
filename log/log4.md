@@ -1137,3 +1137,57 @@
     - If included, define the measurements, graph-selection rules and saved-state requirements in advance
 
 - 4.5 recorded the GAT development fit and inspected attention from its saved selected state
+
+
+
+
+
+# Stage 4 Closing Notes
+
+- Decisions
+
+    - Selected a reference GAT with eight first-layer heads of eight channels each, giving total width 64
+
+    - Retained one second-layer head producing 64 features, ReLU after both convolutions, global sum pooling and a linear classifier
+
+    - Retained LeakyReLU with negative slope 0.2 inside attention scoring
+
+    - Defined the head comparison at fixed total width 64, with head counts 1, 2, 4 and 8
+
+    - Used the shared development settings and minimum-validation-loss selection over 1,000 fixed epochs
+
+    - Adopted selected-state saving for every future model run, pairing the model-state file with its result JSON
+
+    - Kept trained attention inspection in experiments/models/inspect_gat_attention.py
+
+    - Used validation graph 112 and receiving node 0, selected before fitting
+
+- Ideas
+
+    - Agreed to assess whether dataset-wide attention summaries would strengthen interpretation before the final experiments
+
+    - Any adopted analysis will have predefined measurements, graph-selection rules and saved-state requirements
+
+- Report notes
+
+    - The reference GAT contained 5,058 trainable parameters
+
+    - The development fit selected epoch 79 after completing all 1,000 epochs
+
+    - Selected validation loss was 0.2423 and validation accuracy was 0.9444, corresponding to 17 correct predictions among 18 graphs
+
+    - Development-test loss was 0.4058 and accuracy was 0.8000, corresponding to 16 correct predictions among 20 graphs
+
+    - Mean training time per epoch was approximately 0.0475 seconds under the recorded timing convention
+
+    - In the selected trained neighbourhood, first-layer coefficients displayed as approximately one third in every head
+
+    - The second layer assigned coefficients of approximately 0.0394, 0.9212 and 0.0394 to senders 1, 5 and 0 respectively
+
+    - These observations illustrate the selected model's attention on one neighbourhood and do not establish dataset-wide behaviour or causal importance
+
+    - The architecture uses GAT message passing within the project's shared graph-classification pipeline
+
+    - The recorded source commit preceded the uncommitted Stage 4.5 preparation changes, so it does not independently identify the complete source used for that fit
+
+- Stage 4 recorded closing decisions, analysis planning and report notes
