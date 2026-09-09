@@ -625,3 +625,147 @@
     - The observations come from development validation data used for epoch selection; they do not establish final generalisation performance or justify choosing a winner or changing the fixed settings
 
 - 3.4 added shared model construction and development result comparison
+
+
+
+
+
+# 3 Closing Notes
+
+- Decisions
+
+    - Retained GCN, GraphSAGE and GIN as contextual baselines for the later attention investigation
+
+        - All use two message-passing layers, width 64, ReLU after each block, global sum readout and a linear graph classifier
+
+        - Shared widths and training settings provide consistency without making the models identical in parameter count or isolating a single architectural difference
+
+    - Fixed GraphSAGE to mean aggregation with root_weight=True, project=False, normalize=False and bias=True
+
+        - Separate learned transformations combine self and neighbour information
+
+        - Full graph minibatches replace neighbour sampling, and output L2 normalisation is omitted as an explicit project adaptation
+
+    - Fixed GIN to the two-layer GIN-0 adaptation
+
+        - Each convolution contains a two-linear-layer MLP with an internal ReLU, followed by the external ReLU
+
+        - eps=0.0 and train_eps=False keep the self coefficient at one; epsilon is stored as a buffer
+
+        - Only the final node representations are pooled, without concatenating readouts from every layer
+
+    - Retained the established training procedure
+
+        - Exactly 1000 epochs, no early stopping, minimum-validation-cross-entropy selection and the earliest exact tie
+
+        - Clone the selected state and restore it before development-test assessment
+
+        - This explicit decision takes precedence over the older early-stopping instructions in the supplied governing documents
+
+    - Retained MUTAG's established input and development policies
+
+        - Categorical node features and connectivity are used; edge features and continuous attributes are excluded
+
+        - The development partition contains 150 training, 18 validation and 20 test graphs, using split seed 0
+
+        - Training seed 0, batch size 32, Adam learning rate 0.01 and weight decay 0.0005 remain fixed for these contextual models
+
+    - Assigned each file a clear responsibility
+
+        - src/training.py and src/evaluation.py contain the shared fitting and assessment functions
+
+        - src/models/factory.py constructs the model specified by its effective settings
+
+        - experiments/train.py prepares and trains selected models, saves each result and summarises the fits completed in that invocation
+
+        - experiments/compare.py reads explicitly selected existing records without duplicating training or evaluation
+
+        - The separate results reader is an intentional refinement of the roadmap's earlier suggestion to place the comparison in the training runner
+
+    - Adopted shared settings, model_settings and a selected_models list containing only model names
+
+        - Each fit receives a separate effective settings dictionary used consistently for construction, optimisation and recording
+
+        - Model-specific settings will be added when their models are introduced, keeping irrelevant attention fields out of contextual-model records
+
+        - Each selected fit receives a fresh model, optimiser and seeded training-loader generator
+
+        - Existing result destinations are checked before fitting; completed development fits are not repeated merely to print a comparison
+
+    - Preserved the agreed implementation and teaching style
+
+        - Follow the existing model and inspection scripts, without type annotations, return annotations, explanatory comments inside forward or unnecessary conversions
+
+        - Keep terminal commands short and use ordinary python -m module commands
+
+        - Logs explain all relevant nontrivial new operations and arguments, their purpose, technical behaviour and actual output interpretation, while avoiding trivial syntax and repeated teaching
+
+- Ideas
+
+    - Use the mean-versus-sum example in Review 3 to examine what information different neighbourhood aggregators preserve
+
+        - Distinguish retaining multiplicity from guaranteeing an injective representation
+
+    - Revisit how epsilon zero affects the distinction between a receiving node and its neighbours
+
+        - This is a conceptual point for understanding GIN-0, not an instruction to change the fixed model or add another experiment
+
+    - When final result summarisation becomes necessary, extend or consolidate the existing results reader rather than maintaining duplicate reading and formatting code
+
+        - Final fold validation and mean/sample-standard-deviation calculations belong to the planned summarisation work
+
+- Report notes
+
+    - The three implemented contextual models have different parameter counts on MUTAG
+
+        - GCN: 4802
+
+        - GraphSAGE: 9346
+
+        - GIN: 13122
+
+        - All counted parameters are trainable; GIN's fixed epsilon buffers are excluded from these totals
+
+    - Preserve the development evidence in its existing records
+
+        - results/development_gcn_mutag_seed0.json
+
+        - results/development_graphsage_mutag_seed0.json
+
+        - results/development_gin_mutag_seed0.json
+
+    - The saved selected-state validation observations were
+
+        - GCN: epoch 384, loss 0.2568 and accuracy 0.8333
+
+        - GraphSAGE: epoch 33, loss 0.4093 and accuracy 0.7778
+
+        - GIN: epoch 187, loss 0.1833 and accuracy 0.9444
+
+        - These are development observations on validation data used for epoch selection, not final cross-validation findings
+
+    - The recorded GraphSAGE and GIN development-test accuracies were 0.8500 and 0.7500 respectively
+
+        - Their validation ordering does not establish their development-test ordering or final generalisation ranking
+
+        - The small partitions and single fits limit interpretation; no configuration was selected or changed from these observations
+
+    - Distinguish the implemented architectures from their source papers' complete systems
+
+        - GraphSAGE uses full graph minibatches and omits the original algorithm's output L2 normalisation
+
+        - GIN uses two message-passing layers, fixed epsilon and final-layer readout
+
+        - The GIN expressiveness results require their stated assumptions; the model name and use of summation alone do not establish injectivity or full 1-WL distinguishing power
+
+    - Relevant sources for Review 3 are Inductive Representation Learning on Large Graphs, How Powerful Are Graph Neural Networks? and Neural Message Passing for Quantum Chemistry
+
+        - Connect the implemented models to message, aggregation, update and readout operations
+
+        - Explain neighbourhood multisets, injectivity, 1-WL and the limits of architectural comparisons
+
+    - Execution evidence covers the model inspections, recorded development fits and saved-result comparison
+
+        - The comparison command reads historical records and does not exercise the new Stage 3.4 factory or multi-model training loop
+
+        - Those new orchestration changes have not yet been exercised by a supplied training output; the next planned development fit will use them
