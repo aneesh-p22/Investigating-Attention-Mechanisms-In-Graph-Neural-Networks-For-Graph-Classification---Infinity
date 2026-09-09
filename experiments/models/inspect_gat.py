@@ -20,14 +20,23 @@ loader = DataLoader(dataset, batch_size=32, shuffle=False)
 batch = next(iter(loader))
 
 model = GAT(
-    dataset.num_node_features,
-    64,
-    dataset.num_classes,
+    num_features=dataset.num_node_features,
+    attention_total_width=512,
+    num_classes=dataset.num_classes,
+    heads=8,
+    embedding_dim=64,
 )
 model.eval()
 
 print("PyG version:", torch_geometric.__version__)
-print("Configuration: single-head teaching model")
+print("Configuration: reference multi-head GAT")
+print("First-layer heads:", model.conv1.heads)
+print("Channels per head:", model.conv1.out_channels)
+print(
+    "Total first-layer width:",
+    model.conv1.heads * model.conv1.out_channels,
+)
+print("Final node embedding width:", model.conv2.out_channels)
 
 print("\nModel:")
 print(model)
