@@ -785,3 +785,251 @@
         - Stages 4.4 and 4.5 remained ahead
 
 - Commit: 4.3 configured the reference multi-head GAT
+
+
+
+
+
+# 4.4 Attention Coefficient Inspection
+
+- Extended experiments/models/inspect_gat.py to extract attention from both reference GAT convolutions
+
+    - Passed return_attention_weights=True when calling conv1 and conv2 during the shape inspection
+
+    - Each call returned the node-output tensor together with a pair containing the effective edge_index and attention coefficients
+
+        - The node output remained the convolution result before the external ELU
+
+        - The returned edges described the messages used after self-loop handling
+
+        - Each coefficient row corresponded to the same-position column of the returned edge_index
+
+    - Stored these outputs as conv1_edge_index, conv1_attention, conv2_edge_index and conv2_attention
+
+    - The second convolution received the first convolution's output after ELU, preserving the model's actual computation
+
+    - Retained the complete model call after the intermediate inspection
+
+        - Requesting attention coefficients added no learned parameters
+
+- Corrected the inspector's inconsistent structure against the supplied current inspect_gin.py
+
+    - The earlier GAT inspector used direct TUDataset construction, the variable batch, embedded newline characters and different common output labels
+
+    - Replaced direct dataset construction with load_dataset("MUTAG") from src.data
+
+        - Dataset-loading policy now came from the existing shared function
+
+    - Used graph_batch consistently for the DataLoader batch
+
+    - Used separate print() calls for blank lines and matched the existing multiline-call layout
+
+    - Matched the common Model, Parameters, Shape transitions and Model output sections
+
+    - Retained the common classifier and total parameter summaries
+
+        - Removed the additional convolution totals, duplicate trainable total and repeated configuration/version output from this inspector
+
+        - The previously recorded 4.2 and 4.3 observations remained valid historical results
+
+    - Kept model-specific inspection where it had a scientific purpose
+
+        - GIN's epsilon-buffer inspection remained specific to GIN
+
+        - GAT's returned edges and coefficients formed its additional attention section
+
+    - Used torch.nn.functional.elu for the GAT activations
+
+        - This retained the intended ELU operation using the existing torch import
+
+    - Retained model.eval() and torch.no_grad() for evaluation-mode attention inspection without gradient recording
+
+- Defined how to interpret the returned tensors
+
+    - For E' effective directed edge entries, attention_edge_index has shape [2, E']
+
+        - Row 0 identifies sending nodes
+
+        - Row 1 identifies receiving nodes
+
+    - Attention weights have shape [E', heads]
+
+        - Each row identifies an effective edge entry
+
+        - Each column identifies one head
+
+        - For an edge from j to i, column k contains alpha_ij^(k), using receiving-node-first mathematical notation
+
+    - Used each convolution's own returned edges to interpret its coefficients
+
+        - The original input edge_index cannot be assumed to retain the same count or ordering after self-loop handling
+
+- Selected one receiving neighbourhood for readable inspection
+
+    - Set receiving_node=0 before inspecting the coefficient values
+
+        - This is node 0 in the batch, belonging to the first graph in the non-shuffled dataset batch
+
+    - Formed incoming_mask = attention_edge_index[1] == receiving_node
+
+        - The mask selected every effective edge entering that receiver, including its self loop
+
+    - Printed attention_edge_index[:, incoming_mask].t()
+
+        - Selecting columns retained the incoming edges
+
+        - Transposing produced one [source, target] pair per printed row
+
+    - Printed attention_weights[incoming_mask]
+
+        - Applying the same mask preserved alignment between each displayed edge and its coefficient row
+
+        - First-layer rows contained eight coefficients, while second-layer rows contained one
+
+- Checked incoming-neighbourhood normalisation throughout the batch
+
+    - Created incoming_sums using attention_weights.new_zeros((graph_batch.num_nodes, attention_weights.size(1)))
+
+        - The accumulator had one row per node and one column per head
+
+        - new_zeros retained the coefficient tensor's dtype and device
+
+    - Used incoming_sums.index_add_(0, attention_edge_index[1], attention_weights)
+
+        - Dimension 0 selected the accumulator's node rows
+
+        - The receiving-node indices identified the destination row for each edge
+
+        - Each edge's coefficient vector was added into that receiver's row
+
+        - Head columns remained separate
+
+        - The trailing underscore indicated an in-place update
+
+    - Printed incoming_sums[receiving_node] for the selected example
+
+    - Used torch.allclose against torch.ones_like(incoming_sums)
+
+        - atol=1e-6 allowed small absolute floating-point differences
+
+        - rtol=0.0 disabled additional relative tolerance
+
+        - The check covered every receiving node and head in each convolution, not only the printed example
+
+    - The required sum is over incoming messages within each head, not across head columns
+
+    - Both layers used zero coefficient dropout, preserving the neighbourhood-softmax normalisation property during inspection
+
+- Executed python -m experiments.models.inspect_gat successfully
+
+    - The model retained GATConv(7, 64, heads=8), GATConv(512, 64, heads=1) and Linear(in_features=64, out_features=2, bias=True)
+
+    - The classifier contained 130 parameters and the complete model contained 38,210 parameters
+
+    - The shape progression remained [585, 7] to [585, 512] to [585, 64] to [32, 64] to [32, 2]
+
+        - Both ELUs retained their respective input shapes
+
+        - The complete model call also returned [32, 2]
+
+- Interpreted the effective edge counts
+
+    - The original edge_index had shape [2, 1304]
+
+        - This represented 1,304 directed edge entries across the batch
+
+    - Both convolutions returned edge_index with shape [2, 1889]
+
+        - The increase was 1,889 - 1,304 = 585 entries
+
+        - This matched the batch's 585 nodes and was consistent with adding one self loop per node without removing pre-existing loops
+
+    - These counts describe directed message entries, not counts of distinct undirected bonds
+
+- Interpreted first-layer attention
+
+    - conv1_attention had shape [1889, 8]
+
+        - Each effective edge had one coefficient from each of the eight heads
+
+    - The incoming edges for receiving node 0 were [1, 0], [5, 0] and [0, 0], in that order
+
+        - Nodes 1 and 5 supplied neighbour messages
+
+        - Node 0 supplied its own message through the self loop
+
+    - The corresponding attention tensor had three rows and eight columns
+
+        - Every displayed coefficient was 0.3333
+
+        - At the displayed precision, each head divided its weight equally among the three incoming messages
+
+    - The printed incoming sums for node 0 were [1, 1, 1, 1, 1, 1, 1, 1]
+
+    - The batch-wide normalisation check returned True
+
+        - Every receiving-node/head sum was within the specified tolerance of one
+
+- Interpreted second-layer attention
+
+    - conv2_attention had shape [1889, 1]
+
+        - Each effective edge had one coefficient from the second layer's single head
+
+    - The selected incoming edges again appeared as [1, 0], [5, 0] and [0, 0]
+
+    - Their displayed coefficients were 0.3333, 0.3333 and 0.3333
+
+    - The selected node's incoming sum printed as [1]
+
+    - The batch-wide normalisation check returned True
+
+        - The second layer also satisfied the incoming-neighbourhood normalisation property within tolerance
+
+- Interpreted the apparently uniform example cautiously
+
+    - Uniform coefficients are a valid output of a learned attention mechanism
+
+        - Equal logits among three eligible messages produce coefficients of 1/3
+
+        - For a fixed receiver, identical sending-node representations produce equal logits within a head because the same transformation and scoring parameters are applied
+
+    - The printed output did not include the relevant input or intermediate representations
+
+        - Identical representations are therefore a possible explanation, not an established diagnosis of this example
+
+    - The displayed coefficients were rounded
+
+        - Printing 0.3333 for each entry does not establish exact numerical equality
+
+        - The normalisation check established sums near one, not equality among individual coefficients
+
+    - Inspecting one receiving neighbourhood did not establish uniform attention elsewhere in the graph or batch
+
+    - The model was newly initialised and had not been trained
+
+        - These coefficients illustrated implementation behaviour
+
+        - They did not establish learned head redundancy, neighbour importance or predictive usefulness
+
+        - This was not the later uniform-attention control, which requires explicitly constrained parameters and fresh training
+
+- Recorded the agreed consistency work
+
+    - Finish Stage 4 before beginning the wider repository audit
+
+    - Audit current files one category at a time using the source supplied for that category
+
+        - Compare scientific behaviour, shared structure, naming, formatting and explanatory writing
+
+        - Where conventions differ and the preferred choice is not already settled, present the alternatives and establish the user's preference
+
+        - Update affected logs where necessary while preserving actual execution history and recording subsequent corrections
+
+    - Prefer short descriptive print labels with a few explanatory words
+
+        - Avoid full-sentence labels
+
+        - The long normalisation label in this execution remains part of the historical output; label standardisation is pending
+
+- Commit: 4.4 added attention coefficient inspection
