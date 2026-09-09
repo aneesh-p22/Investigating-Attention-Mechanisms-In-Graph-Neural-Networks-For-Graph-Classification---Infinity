@@ -1845,3 +1845,137 @@
     - The successful recorded fit then completed and saved the JSON normally
 
 - Commit: 2.5 recorded the GCN development fit
+
+
+
+
+
+# 2 Closing Notes
+
+- Decisions
+
+    - GCN is the first contextual graph-classification baseline
+
+        - It uses two GCNConv layers
+
+        - MUTAG node features enter with width 7
+
+        - Both graph-convolution layers produce width 64
+
+        - ReLU is applied after both graph-convolution layers
+
+        - Global sum pooling produces one 64-dimensional representation per graph
+
+        - A linear classifier maps the graph representation to the two MUTAG class logits
+
+    - GCNConv uses the fixed operator settings established in Stage 2
+
+        - improved=False
+
+        - cached=False
+
+        - add_self_loops=True
+
+        - normalize=True
+
+        - bias=True
+
+        - cached=False is required because different graph minibatches have different connectivity and therefore different normalisation
+
+    - Principal model inputs remain node-label features and graph connectivity
+
+        - MUTAG categorical node labels are used as x
+
+        - Graph connectivity is used through edge_index
+
+        - Available edge features are deliberately excluded from the GCN forward pass
+
+    - Global sum pooling remains the shared graph readout
+
+        - This is the supervisor-recommended project readout
+
+        - It is permutation invariant with respect to node ordering
+
+    - Development training uses the fixed settings established before development-score inspection
+
+        - Adam optimiser
+
+        - Learning rate 0.01
+
+        - Weight decay 0.0005
+
+        - Batch size 32
+
+        - Training seed 0
+
+        - Development split seed 0
+
+        - Fixed training budget of 1,000 epochs
+
+        - No patience or early stopping
+
+    - Model-state selection uses minimum validation cross-entropy
+
+        - Validation is evaluated after every epoch
+
+        - Strictly lower validation loss replaces the selected state
+
+        - An exact tie therefore retains the earlier epoch
+
+        - The selected PyTorch state tensors are preserved with clone
+
+        - The selected state is restored after all 1,000 epochs have completed
+
+    - The development test is evaluated only after validation selection and restoration
+
+        - Development-test performance is development evidence
+
+        - It must not be used to choose model settings or the selected epoch
+
+        - Final research performance will later come from the locked cross-validation protocol
+
+    - Recorded fits preserve source and execution provenance
+
+        - Experiment source and effective settings are committed before the recorded fit
+
+        - The result stores the source commit that produced it
+
+        - Existing result files are not silently overwritten
+
+        - Runtime measures the training pass only, excluding validation, development-test evaluation and result writing
+
+- Ideas
+
+    - Seeded CUDA training does not necessarily imply bit-for-bit identical numerical execution
+
+        - Strict deterministic execution should only be investigated later if it becomes a genuine reproducibility requirement
+
+    - Runtime differences between model families can later provide useful practical context when all models use the same timing convention
+
+- Report notes
+
+    - The project GCN is an adaptation of the Kipf and Welling GCN operator to graph classification rather than an exact reproduction of their transductive node-classification architecture
+
+    - The complete GCN contains 4,802 parameters, all of which are trainable
+
+    - The recorded MUTAG development fit selected epoch 384 after completing all 1,000 epochs
+
+        - Selected validation loss: 0.256849080324173
+
+        - Selected validation accuracy: 0.8333333333333334
+
+        - Development-test loss: 0.49510836601257324
+
+        - Development-test accuracy: 0.8
+
+    - The recorded training passes took 37.63074249937199 seconds in total
+
+        - Mean timed training-pass duration was approximately 0.0376 seconds per epoch
+
+    - The recorded run used CUDA on an NVIDIA GeForce RTX 4070 Laptop GPU
+
+    - The development result is stored in results/development_gcn_mutag_seed0.json
+
+    - The result records source commit 9898a4a8d4f8da9baf5460dcc28ee95d7422eaba
+
+    - These development measurements should not be compared directly with the original GCN paper's node-classification results because the tasks, datasets, architecture and evaluation protocols differ
