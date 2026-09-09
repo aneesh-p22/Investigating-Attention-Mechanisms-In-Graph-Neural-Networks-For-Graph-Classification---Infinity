@@ -4,7 +4,7 @@ from torch_geometric.loader import DataLoader
 
 from src.data import load_dataset, set_seed, stratified_split
 from src.evaluation import evaluate
-from src.models.gcn import GCN
+from src.models.graphsage import GraphSAGE
 from src.recording import (
     get_result_path,
     get_source_commit,
@@ -15,7 +15,7 @@ from src.training import train_model
 
 
 settings = {
-    "model": "GCN",
+    "model": "GraphSAGE",
     "variant": None,
     "dataset": "MUTAG",
     "baseline_width": 64,
@@ -74,7 +74,7 @@ def main():
         "cuda" if torch.cuda.is_available() else "cpu"
     )
 
-    model = GCN(
+    model = GraphSAGE(
         dataset.num_node_features,
         settings["baseline_width"],
         dataset.num_classes,
