@@ -4,24 +4,15 @@ from torch_geometric.nn import GATConv, global_add_pool
 
 
 class GAT(nn.Module):
-    """Two-layer GAT classifier with a fixed total first-layer width."""
-
-    def __init__(
-        self,
-        num_features,
-        attention_total_width,
-        num_classes,
-        heads,
-        embedding_dim,
-    ):
+    def __init__(self, num_features, hidden_dim, num_classes, heads):
         super().__init__()
 
-        if heads < 1 or attention_total_width % heads != 0:
+        if heads < 1 or hidden_dim % heads != 0:
             raise ValueError(
-                "heads must be positive and divide attention_total_width exactly"
+                "heads must be positive and divide hidden_dim exactly"
             )
 
-        channels_per_head = attention_total_width // heads
+        channels_per_head = hidden_dim // heads
 
         self.conv1 = GATConv(
             num_features,
@@ -37,8 +28,8 @@ class GAT(nn.Module):
         )
 
         self.conv2 = GATConv(
-            attention_total_width,
-            embedding_dim,
+            hidden_dim,
+            hidden_dim,
             heads=1,
             concat=False,
             negative_slope=0.2,
@@ -49,14 +40,17 @@ class GAT(nn.Module):
             residual=False,
         )
 
-        self.classifier = nn.Linear(embedding_dim, num_classes)
+        self.classifier = nn.Linear(
+            hidden_dim,
+            num_classes,
+        )
 
     def forward(self, x, edge_index, batch):
         x = self.conv1(x, edge_index)
-        x = F.elu(x)
+        x = F.relu(x)
 
         x = self.conv2(x, edge_index)
-        x = F.elu(x)
+        x = F.relu(x)
 
         x = global_add_pool(x, batch)
         x = self.classifier(x)

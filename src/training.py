@@ -7,7 +7,6 @@ from src.evaluation import evaluate
 
 
 def train_epoch(model, loader, optimizer, device):
-    """Train the model for one epoch and return loss and accuracy."""
     model.train()
 
     total_loss = 0.0
@@ -56,7 +55,6 @@ def train_model(
     device,
     epochs,
 ):
-    """Train for fixed epochs and restore the lowest-validation-loss state."""
     best_epoch = 0
     best_val_loss = float("inf")
     best_val_accuracy = 0.0

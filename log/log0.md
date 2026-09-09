@@ -34,7 +34,7 @@
 
     - Git initialised and initial commit succeeded
 
-    - Github repository created
+    - GitHub repository created
 
     - git ls-files showed .gitignore, README.md and log/log0.md as the tracked files
 
@@ -196,7 +196,7 @@
 
     - experiments/datasets will contain dataset inspection scripts
 
-    - Empty __init__.py files will mark these directories as regular Python packages
+    - Empty __init__.py files mark these directories as regular Python packages
 
     - Additional source files will be introduced when their functionality is needed
 
@@ -224,7 +224,9 @@
 
     - All specified requirements were already satisfied in .venv
 
-    - Package layout creation and the README development-status update are pending confirmation
+    - Created the package layout and empty __init__.py files
+
+    - Updated the README development status
 
 
 
@@ -284,4 +286,48 @@
 
 - Execution
 
-    - File creation, compilation and inspection of the resulting PDF are pending confirmation
+    - Created report/main.tex and report/references.bib
+
+    - Compiled the report skeleton successfully in Overleaf
+
+    - Inspected the resulting PDF
+
+
+
+
+
+# 0 Closing Notes
+
+- Decisions
+
+    - Use Git and GitHub to preserve the project source and development history
+
+    - Keep the Python environment in .venv and retain the verified package versions in requirements.txt
+
+    - Exclude the virtual environment, downloaded datasets and generated Python caches from Git
+
+    - Keep the repository layout minimal and introduce additional files when needed
+
+    - Run project modules from the repository root using python -m
+
+    - Use Overleaf for report compilation and keep the repository copies of the report source up to date
+
+    - Retain an empty report skeleton until the dedicated report-writing phase
+
+- Ideas
+
+    - Extend the ignore rules and bibliography when later stages create a need
+
+    - No additional setup infrastructure is required before beginning dataset inspection
+
+- Report notes
+
+    - The environment successfully imported the required packages and performed a small GPU matrix calculation
+
+    - The recorded GPU was an NVIDIA GeForce RTX 4070 Laptop GPU, using PyTorch 2.13.0+cu130 and PyTorch Geometric 2.8.0.post1
+
+    - README.md and requirements.txt preserve the environment setup instructions and selected package versions
+
+    - The report skeleton compiled successfully, and the initial bibliography contains the GCN and GAT papers
+
+    - Stage 0 establishes the repository, environment and report skeleton; dataset and model evidence will be recorded in subsequent stages

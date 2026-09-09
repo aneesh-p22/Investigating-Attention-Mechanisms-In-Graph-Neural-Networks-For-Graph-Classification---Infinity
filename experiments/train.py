@@ -3,12 +3,13 @@ from torch.optim import Adam
 from torch_geometric.loader import DataLoader
 
 from src.data import load_dataset, set_seed, stratified_split
-from src.models.factory import build_model
 from src.evaluation import evaluate
+from src.models.factory import build_model
 from src.recording import (
     get_result_path,
     get_source_commit,
     prepare_result_path,
+    save_model_state,
     save_result,
 )
 from src.training import train_model
@@ -17,7 +18,7 @@ from src.training import train_model
 settings = {
     "variant": None,
     "dataset": "MUTAG",
-    "baseline_width": 64,
+    "hidden_dim": 64,
     "learning_rate": 0.01,
     "weight_decay": 0.0005,
     "epochs": 1000,
@@ -30,12 +31,13 @@ model_settings = {
     "GCN": {},
     "GraphSAGE": {},
     "GIN": {},
+    "GAT": {
+        "heads": 8,
+    },
 }
 
 selected_models = [
-    "GCN",
-    "GraphSAGE",
-    "GIN",
+    "GAT",
 ]
 
 
@@ -53,7 +55,11 @@ def main():
             result_type,
         )
 
+        state_path = result_path.replace(".json", ".pt")
+
         prepare_result_path(result_path)
+        prepare_result_path(state_path)
+
         run_settings.append(current_settings)
 
     source_commit = get_source_commit()
@@ -69,38 +75,30 @@ def main():
         "cuda" if torch.cuda.is_available() else "cpu"
     )
 
-    print(f"Source commit: {source_commit}")
-    print(f"Device: {device}")
-    print(f"Training graphs: {len(train_indices)}")
-    print(f"Validation graphs: {len(val_indices)}")
-    print(f"Development test graphs: {len(test_indices)}")
-
-    results = []
+    print("Source commit:", source_commit)
+    print("Device:", device)
+    print("Training graphs:", len(train_indices))
+    print("Validation graphs:", len(val_indices))
+    print("Development test graphs:", len(test_indices))
 
     for current_settings in run_settings:
-        if (
-            current_settings["dataset"] != settings["dataset"]
-            or current_settings["split_seed"] != settings["split_seed"]
-        ):
-            raise ValueError(
-                "Dataset and split seed must remain shared across models."
-            )
-
         result_path = get_result_path(
             current_settings,
             result_type,
         )
 
+        state_path = result_path.replace(".json", ".pt")
+
         set_seed(current_settings["seed"])
 
-        train_generator = torch.Generator()
-        train_generator.manual_seed(current_settings["seed"])
+        generator = torch.Generator()
+        generator.manual_seed(current_settings["seed"])
 
         train_loader = DataLoader(
             dataset[train_indices],
             batch_size=current_settings["batch_size"],
             shuffle=True,
-            generator=train_generator,
+            generator=generator,
         )
 
         val_loader = DataLoader(
@@ -167,7 +165,7 @@ def main():
             if parameter.requires_grad
         )
 
-        mean_training_seconds = (
+        mean_seconds_per_epoch = (
             training_seconds / current_settings["epochs"]
         )
 
@@ -214,12 +212,15 @@ def main():
             },
             "runtime": {
                 "training_seconds": training_seconds,
-                "mean_seconds_per_epoch": mean_training_seconds,
+                "mean_seconds_per_epoch": mean_seconds_per_epoch,
                 "convention": (
-                    "training pass only; includes loader iteration, "
-                    "device transfer, forward pass, loss, backward pass "
-                    "and optimiser update; excludes validation, "
-                    "development test and result writing"
+                    "train_epoch call only; includes loader iteration, "
+                    "device transfer, forward pass, loss, backward pass, "
+                    "optimiser update and metric calculation and "
+                    "accumulation; excludes validation, development "
+                    "test, checkpoint copying and restoration, "
+                    "progress printing, model-state saving and "
+                    "result writing"
                 ),
             },
             "device": {
@@ -227,26 +228,50 @@ def main():
                 "name": device_name,
             },
             "source_commit": source_commit,
+            "model_state_path": state_path,
         }
+
+        save_model_state(
+            state_path,
+            model,
+        )
+
+        print()
+        print("Saved model state:", state_path)
 
         print()
         print("Selected state:")
-        print(f"Selected epoch: {best_epoch}")
-        print(f"Selected validation loss: {best_val_loss:.4f}")
-        print(f"Selected validation accuracy: {best_val_accuracy:.4f}")
+        print("Selected epoch:", best_epoch)
+
+        print(
+            f"Validation loss: {best_val_loss:.4f}"
+        )
+
+        print(
+            f"Validation accuracy: {best_val_accuracy:.4f}"
+        )
 
         print()
         print("Development test:")
-        print(f"Test loss: {test_loss:.4f}")
-        print(f"Test accuracy: {test_accuracy:.4f}")
+
+        print(
+            f"Test loss: {test_loss:.4f}"
+        )
+
+        print(
+            f"Test accuracy: {test_accuracy:.4f}"
+        )
 
         print()
-        print(f"Total parameters: {total_parameters}")
-        print(f"Trainable parameters: {trainable_parameters}")
-        print(f"Training seconds: {training_seconds:.4f}")
+        print("Total parameters:", total_parameters)
+        print("Trainable parameters:", trainable_parameters)
+
         print(
-            f"Mean training seconds per epoch: "
-            f"{mean_training_seconds:.4f}"
+            f"Training seconds: {training_seconds:.4f}"
+        )
+
+        print(
+            f"Mean seconds per epoch: {mean_seconds_per_epoch:.4f}"
         )
 
         save_result(
@@ -254,28 +279,8 @@ def main():
             result,
         )
 
-        print(f"Saved result: {result_path}")
-
-        results.append(result)
-
-    print()
-    print("Completed development fits:")
-
-    for result in results:
-        selection = result["selection"]
-        parameters = result["parameters"]
-        development_test = result["development_test"]
-        runtime = result["runtime"]
-
-        print(
-            f"{result['settings']['model']}: "
-            f"selected epoch {selection['selected_epoch']}, "
-            f"val loss {selection['validation_loss']:.4f}, "
-            f"val accuracy {selection['validation_accuracy']:.4f}, "
-            f"development test accuracy {development_test['accuracy']:.4f}, "
-            f"parameters {parameters['total']}, "
-            f"seconds per epoch {runtime['mean_seconds_per_epoch']:.4f}"
-        )
+        print()
+        print("Saved result:", result_path)
 
 
 if __name__ == "__main__":

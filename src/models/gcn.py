@@ -1,17 +1,15 @@
+import torch.nn as nn
 import torch.nn.functional as F
-from torch import nn
 from torch_geometric.nn import GCNConv, global_add_pool
 
 
 class GCN(nn.Module):
-    """Two-layer GCN for graph classification."""
-
-    def __init__(self, in_channels, baseline_width, num_classes):
+    def __init__(self, num_features, hidden_dim, num_classes):
         super().__init__()
 
         self.conv1 = GCNConv(
-            in_channels,
-            baseline_width,
+            num_features,
+            hidden_dim,
             improved=False,
             cached=False,
             add_self_loops=True,
@@ -20,8 +18,8 @@ class GCN(nn.Module):
         )
 
         self.conv2 = GCNConv(
-            baseline_width,
-            baseline_width,
+            hidden_dim,
+            hidden_dim,
             improved=False,
             cached=False,
             add_self_loops=True,
@@ -30,7 +28,7 @@ class GCN(nn.Module):
         )
 
         self.classifier = nn.Linear(
-            baseline_width,
+            hidden_dim,
             num_classes,
         )
 

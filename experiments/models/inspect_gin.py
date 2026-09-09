@@ -22,6 +22,8 @@ model = GIN(
     dataset.num_classes,
 )
 
+model.eval()
+
 print("Model:")
 print(model)
 
@@ -50,41 +52,42 @@ for name, buffer in model.named_buffers():
 print()
 print("Shape transitions:")
 
-x = graph_batch.x
-print("Input:", x.shape)
+with torch.no_grad():
+    x = graph_batch.x
+    print("Input node features:", x.shape)
 
-x = model.conv1(
-    x,
-    graph_batch.edge_index,
-)
-print("After conv1:", x.shape)
+    x = model.conv1(
+        x,
+        graph_batch.edge_index,
+    )
+    print("After first convolution:", x.shape)
 
-x = torch.relu(x)
-print("After ReLU 1:", x.shape)
+    x = torch.relu(x)
+    print("After first ReLU:", x.shape)
 
-x = model.conv2(
-    x,
-    graph_batch.edge_index,
-)
-print("After conv2:", x.shape)
+    x = model.conv2(
+        x,
+        graph_batch.edge_index,
+    )
+    print("After second convolution:", x.shape)
 
-x = torch.relu(x)
-print("After ReLU 2:", x.shape)
+    x = torch.relu(x)
+    print("After second ReLU:", x.shape)
 
-x = global_add_pool(
-    x,
-    graph_batch.batch,
-)
-print("After sum pooling:", x.shape)
+    x = global_add_pool(
+        x,
+        graph_batch.batch,
+    )
+    print("After sum pooling:", x.shape)
 
-x = model.classifier(x)
-print("After classifier:", x.shape)
+    x = model.classifier(x)
+    print("After classifier:", x.shape)
 
-output = model(
-    graph_batch.x,
-    graph_batch.edge_index,
-    graph_batch.batch,
-)
+    output = model(
+        graph_batch.x,
+        graph_batch.edge_index,
+        graph_batch.batch,
+    )
 
-print()
-print("Model output:", output.shape)
+    print()
+    print("Model output shape:", output.shape)

@@ -3,7 +3,6 @@ import torch.nn.functional as F
 
 
 def evaluate(model, loader, device):
-    """Evaluate the model without updating its parameters."""
     model.eval()
 
     total_loss = 0.0
