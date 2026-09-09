@@ -1023,3 +1023,117 @@
     - Record the actual trained coefficients and their interpretation after execution
 
 - 4.5 added shared selected-state saving and recorded the GAT development fit
+
+
+
+
+
+- Added experiments/models/inspect_gat_attention.py
+
+    - Read the development JSON and obtained the recorded model settings and model_state_path
+
+    - Selected the first graph from the saved validation indices, giving dataset graph 112
+
+    - Retained receiving node 0 as chosen before fitting
+
+    - Used a one-graph DataLoader to retain the graph_batch interface
+
+    - Reconstructed GAT using the recorded hidden width and head count
+
+    - Loaded the saved state dictionary onto the CPU with torch.load
+
+    - Copied the saved parameters and buffers into the model with load_state_dict
+
+    - Used model.eval() and torch.no_grad() for inspection
+
+- Kept the trained inspection focused
+
+    - Retained the shape walkthrough through both convolutions, both ReLU operations, pooling and classification
+
+    - Printed the complete model output shape
+
+    - Inspected the selected receiver's incoming connections, coefficients and per-head sums in both layers
+
+    - Printed tensors directly without edge-by-edge formatting or value conversions
+
+    - Left parameter listings in the general model inspector
+
+    - Omitted whole-graph coefficient listings and repeated selected-node output
+
+- Confirmed saved-state loading and shape transitions
+
+    - Ran python -m experiments.models.inspect_gat_attention
+
+    - The script loaded the recorded state without error and identified selected epoch 79
+
+    - The selected validation graph had 13 nodes with seven input features each
+
+    - Both convolutions produced shape [13, 64], which both ReLU operations preserved
+
+    - Sum pooling produced shape [1, 64]
+
+    - The classifier and complete model call produced shape [1, 2]
+
+    - These outputs confirmed execution of the loaded model on the predetermined graph
+
+- Inspected returned connectivity
+
+    - The original edge index had shape [2, 26]
+
+    - Both convolutions returned edge indices with shape [2, 39]
+
+    - The increase of 13 connections was consistent with adding one self-connection per node
+
+    - Both layers returned incoming connections [1, 0], [5, 0] and [0, 0] for receiver 0
+
+    - Coefficient rows were interpreted using these returned connections
+
+- Recorded first-layer attention
+
+    - The complete coefficient tensor had shape [39, 8]
+
+    - The selected neighbourhood contained three incoming connections and eight heads
+
+    - Every displayed incoming coefficient was approximately 0.3333
+
+    - All eight incoming coefficient sums displayed as one
+
+    - Attention was uniform within this selected neighbourhood at the printed precision
+
+    - The inspection did not establish the reason for this equality or uniformity elsewhere in the graph
+
+- Recorded second-layer attention
+
+    - The complete coefficient tensor had shape [39, 1]
+
+    - The displayed incoming coefficients were 0.0394 for sender 1, 0.9212 for sender 5 and 0.0394 for the self-connection
+
+    - The incoming coefficient sum displayed as 1.0000
+
+    - Sender 5 received the largest coefficient in this neighbourhood
+
+    - The second layer calculated attention from representations entering that layer after the first convolution and ReLU
+
+    - The same connectivity therefore supported different coefficient patterns in the two layers
+
+- Interpreted the trained example
+
+    - Both layers displayed the expected neighbourhood normalisation for the selected receiver
+
+    - A coefficient scales a sender's transformed feature vector within one layer and head
+
+    - The coefficient 0.9212 does not represent a percentage contribution to the final graph prediction
+
+    - This inspection describes one predetermined neighbourhood in one validation graph
+
+    - It does not establish dataset-wide attention behaviour or causal importance
+
+    - The earlier untrained inspection used a different graph, so differences between the examples cannot be attributed solely to training
+
+- Recorded the later analysis planning item
+
+    - Revisit whether dataset-wide attention summaries would improve interpretation before the final experiments
+
+    - If included, define the measurements, graph-selection rules and saved-state requirements in advance
+
+- 4.5 recorded the GAT development fit and inspected attention from its saved selected state
