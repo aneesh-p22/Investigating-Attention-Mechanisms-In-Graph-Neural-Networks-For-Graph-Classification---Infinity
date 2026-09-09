@@ -460,3 +460,168 @@
 
 
 
+# 3.4 Shared Model Construction and Development Comparison
+
+- Added src/models/factory.py with build_model(settings, num_features, num_classes)
+
+    - The function reads settings["model"] and uses explicit if/elif branches to construct GCN, GraphSAGE or GIN
+
+    - Each branch passes the dataset's input feature count, settings["baseline_width"] and the number of graph classes into the corresponding constructor
+
+    - The supplied settings therefore determine both the model's identity and its configured width
+
+    - Every call constructs a fresh model rather than returning an existing model with previously learned parameters
+
+    - An unsupported model name raises ValueError instead of silently constructing a different model
+
+    - Device placement and optimiser construction remain in the training runner because the factory's responsibility is model construction
+
+- Organised experiments/train.py around shared settings, model-specific settings and a list of selected model names
+
+    - settings contains the shared defaults, including dataset, width, optimiser settings, epoch budget, batch size and seeds
+
+    - model_settings contains a dictionary for each model's additional settings or overrides
+
+        - The GCN, GraphSAGE and GIN entries are currently empty because they use the shared defaults
+
+        - Later model-specific fields can be added to the relevant entries without placing irrelevant attention settings in non-attention model records
+
+    - selected_models contains only model names and determines which models are trained and their execution order
+
+    - This replaces repeatedly changing the runner's model import and constructor when moving between models
+
+- Prepared a separate effective settings dictionary for each selected model
+
+    - settings.copy() creates a new dictionary containing the shared values
+
+        - The current values are scalars or None, so a shallow dictionary copy is sufficient for the updates performed here
+
+        - Changing one model's dictionary does not replace values in the shared settings dictionary or another model's dictionary
+
+    - current_settings.update(model_settings[model_name]) adds model-specific fields and replaces shared values where the same key is explicitly supplied
+
+    - current_settings["model"] = model_name records the selected identity after applying the overrides
+
+    - The factory, optimiser, training call, filename construction and result record all use this effective dictionary
+
+    - Saving current_settings records the settings used for that individual fit rather than the complete collection of configurations for other models
+
+- Added an initial loop to prepare all requested runs before fitting
+
+    - get_result_path(current_settings, result_type) obtains each run's destination using the existing naming function
+
+    - prepare_result_path(result_path) applies the existing overwrite protection before any selected model starts training
+
+    - Checking all destinations first avoids completing an earlier fit before discovering that a later selected run already has a result file
+
+    - run_settings.append(current_settings) retains each prepared dictionary for the subsequent training loop
+
+    - get_source_commit() obtains the source identity once for the invocation, and each result records that identity
+
+- Loaded the dataset and constructed the development partitions once per training invocation
+
+    - All selected models use the same dataset and the same train, validation and development-test index lists
+
+    - The dataset and split seed remain shared settings rather than model-specific experimental choices
+
+    - The runner checks that the effective dataset and split seed still match the shared values
+
+        - If either differs, it raises ValueError because the already prepared dataset and partitions would not match the settings being recorded for that model
+
+    - Device selection is also shared across the selected fits
+
+- Added the training loop over the prepared run_settings dictionaries
+
+    - set_seed(current_settings["seed"]) resets the ordinary random generators before constructing each model
+
+    - A new torch.Generator is created and seeded for each training loader, preventing the shuffle-generator state from carrying over from the preceding fit
+
+    - Fresh training, validation and test loaders are constructed using the shared partition indices and the effective batch size
+
+    - build_model(current_settings, ...) creates the selected model, and .to(device) places its parameters and buffers on the chosen device
+
+    - A fresh Adam optimiser receives that model's parameters and the effective learning rate and weight decay
+
+    - Each fit therefore begins with its own model, optimiser and loader generator while retaining the shared data partitions
+
+- Preserved the established training, selection and recording behaviour
+
+    - The shared train_model still returns selected epoch, selected validation loss, selected validation accuracy and training-pass seconds
+
+    - The configured budget remains exactly 1000 epochs without early stopping
+
+    - Selection still uses minimum validation cross-entropy, retaining the earliest exact tie and restoring the cloned selected state
+
+    - evaluate assesses the restored model on the development-test partition once and returns loss and accuracy
+
+    - Each result retains its effective settings, input policy, partition indices, selection details, development-test metrics, parameter counts, runtime convention, device and source commit
+
+    - save_result(result_path, result) writes each completed fit through the existing recording function
+
+- Added a final summary of the fits completed during the current training invocation
+
+    - results.append(result) retains each completed fit's existing result dictionary after it has been saved
+
+    - The final loop reads those dictionaries to print the model, selected epoch, validation loss and accuracy, development-test accuracy, parameter count and mean training seconds per epoch
+
+    - It does not repeat model evaluation or calculate new predictions
+
+    - The in-memory results list contains only the fits from that invocation; the saved JSON files preserve results across separate executions
+
+- Kept experiments/train.py focused on training and its resulting outputs
+
+    - Its main guard calls main(), and the normal training command remains python -m experiments.train
+
+    - Reading historical records is handled separately, so no argparse flag or run-mode setting is needed
+
+    - train.py does not need import json because it constructs Python dictionaries and delegates JSON writing to save_result in src/recording.py
+
+- Added experiments/compare.py to read existing development records
+
+    - result_paths explicitly selects the saved GCN, GraphSAGE and GIN JSON files
+
+    - Keeping this list separate from the training settings makes the chosen historical records independent of later changes to selected_models or experiment settings
+
+    - open(result_path, encoding="utf-8") opens each file for reading, and the with block closes it afterwards
+
+    - json.load(result_file) converts the JSON contents into Python dictionaries and values
+
+    - The script reads the saved settings, selection and parameters sections and prints their relevant fields
+
+    - Validation accuracy is the accuracy at the selected minimum-validation-loss epoch, not necessarily the highest validation accuracy reached during training
+
+    - This script performs no model construction, training, evaluation or result writing, so it does not duplicate the training runner
+
+- Ran python -m experiments.compare
+
+    - All three selected records were read successfully and reported MUTAG, training seed 0 and split seed 0
+
+    - GCN selected epoch 384, with validation loss 0.2568, validation accuracy 0.8333 and 4802 parameters
+
+    - GraphSAGE selected epoch 33, with validation loss 0.4093, validation accuracy 0.7778 and 9346 parameters
+
+    - GIN selected epoch 187, with validation loss 0.1833, validation accuracy 0.9444 and 13122 parameters
+
+    - Total and trainable parameter counts matched for each model
+
+    - The displayed records were results/development_gcn_mutag_seed0.json, results/development_graphsage_mutag_seed0.json and results/development_gin_mutag_seed0.json
+
+    - This execution establishes successful reading and display of the saved records; it does not execute the new factory or multi-model training loop, or independently verify equality of the stored partition indices
+
+    - No additional development fits were run for this comparison
+
+- Interpreted the development observations alongside the model differences
+
+    - GIN had the lowest selected validation loss and highest selected validation accuracy among these three recorded fits
+
+    - GCN used the fewest parameters, followed by GraphSAGE and GIN
+
+    - The models share the established inputs, two message-passing layers, width 64, ReLU, sum readout and training procedure, but their learned transformations and aggregation rules differ
+
+    - GCN uses degree-normalised propagation, GraphSAGE combines separate self and mean-neighbour transformations, and GIN applies MLPs after combining self and neighbour sums
+
+    - These differences mean that matching feature width does not match parameter count or isolate the effect of one architectural factor
+
+    - The observations come from development validation data used for epoch selection; they do not establish final generalisation performance or justify choosing a winner or changing the fixed settings
+
+- 3.4 added shared model construction and development result comparison
