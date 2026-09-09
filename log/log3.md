@@ -243,3 +243,220 @@
     - Validation, development-test assessment and result writing are excluded, so this value is not the complete elapsed duration of the command
 
 - 3.2 added GraphSAGE classifier and recorded MUTAG development fit
+
+
+
+
+
+# 3.3 GIN
+
+- Added src/models/gin.py to implement a Graph Isomorphism Network using PyG's GINConv operator
+
+    - GINConv updates each node by summing its incoming neighbour representations, adding a weighted contribution from the receiving node itself, and passing the combined vector through a neural network
+
+    - Its operation is MLP((1 + epsilon) × node vector + sum(neighbour vectors)), where MLP means multilayer perceptron
+
+    - The neighbourhood sum and self addition happen before the learned transformations inside the MLP
+
+    - Unlike GraphSAGE's separate self and neighbour transformations, this configuration combines their representations first and then transforms the combined vector
+
+- Used sum aggregation to retain information about repeated neighbour features
+
+    - A neighbourhood is a multiset: an unordered collection in which the same feature vector can appear more than once because different nodes can have identical features
+
+    - Summation is independent of neighbour ordering but includes every occurrence
+
+    - For example, two neighbours represented by [0, 1] contribute [0, 2], whereas one such neighbour contributes [0, 1]; mean aggregation produces [0, 1] in both cases
+
+    - With MUTAG's initial one-hot atom features and epsilon zero, the first aggregation gives atom-type counts across the receiving node and its neighbours
+
+    - Later layers sum learned feature vectors, so their coordinates should not be interpreted directly as atom counts
+
+- Constructed the classifier using num_features, hidden_dim and num_classes
+
+    - num_features is supplied by dataset.num_node_features and equals 7 for MUTAG
+
+    - hidden_dim is the established contextual-baseline width of 64 features per node
+
+    - num_classes is supplied by dataset.num_classes and equals 2, determining the number of graph-class logits
+
+    - GINConv receives an actual neural network as its first argument rather than separate input and output dimensions; the Linear layers inside that network determine its dimensions
+
+- Defined the first convolution's MLP using nn.Sequential
+
+    - nn.Sequential stores the supplied modules and applies them in their written order, passing each output into the next operation
+
+    - nn.Linear(num_features, hidden_dim) maps each aggregated 7-feature vector to 64 features
+
+        - It learns a weight matrix with shape [64, 7] and, through the default bias=True, an additive bias with shape [64]
+
+        - The same transformation is applied to every node's aggregated vector
+
+    - nn.ReLU() applies the elementwise operation max(0, x), introducing a nonlinearity between the two linear transformations
+
+        - Without this intervening nonlinearity, the two affine transformations could be combined into one affine transformation
+
+        - ReLU has no learned parameters and retains the 64-feature shape
+
+    - nn.Linear(hidden_dim, hidden_dim) learns a second transformation from 64 features to 64 features, with its own weights and bias
+
+    - The complete first MLP therefore follows 7 → 64 → 64 and learns a nonlinear function of the combined self and neighbourhood information
+
+- Defined the second convolution with a separate nn.Sequential network following 64 → 64 → 64
+
+    - It receives the learned node representations produced by the first convolution and external ReLU, rather than receiving the original atom features again
+
+    - Its two Linear layers each have a [64, 64] weight matrix and a [64] bias
+
+    - Each convolution owns its own MLP; parameters are not shared between the two graph layers
+
+    - Two GINConv calls perform two rounds of message passing, allowing information from nodes up to two edges away to influence a node representation
+
+    - The four Linear layers inside the two MLPs do not create four rounds of message passing because they transform node vectors without exchanging information along edges
+
+- Set eps=0.0 and train_eps=False in both GINConv layers
+
+    - eps sets epsilon in the self coefficient 1 + epsilon
+
+    - eps=0.0 therefore includes the receiving node with coefficient one; it does not remove the self contribution
+
+    - train_eps=False keeps epsilon fixed during training, giving the GIN-0 variant specified for the project
+
+    - PyG's GINConv uses sum aggregation by default, so the supplied MLP and epsilon arguments are sufficient to specify this operation
+
+    - Kept the original edge_index without adding self loops because GINConv already adds its explicit self term
+
+        - An additional self loop would also include the node through the neighbour sum, changing its effective contribution
+
+- Distinguished fixed epsilon buffers from learned parameters
+
+    - With train_eps=False, PyG registers each epsilon tensor as a buffer rather than a parameter
+
+    - A buffer is persistent model state that moves with model.to(device) and is included in model.state_dict(), but is absent from model.parameters()
+
+    - The existing Adam optimiser therefore receives the MLP and classifier parameters without receiving epsilon
+
+    - The existing selected-state cloning and restoration also includes these buffers because it operates on state_dict()
+
+    - Each epsilon buffer contains one value, shared across the nodes and feature coordinates processed by that convolution; it is not a separate coefficient for every node
+
+- Implemented forward using the established classifier structure
+
+    - self.conv1(x, edge_index) performs neighbourhood summation, self addition and the first MLP, followed by F.relu(x)
+
+    - self.conv2(x, edge_index) repeats these operations on the learned representations, followed by another F.relu(x)
+
+    - The internal nn.ReLU() and external F.relu(x) perform the same activation at different positions
+
+        - nn.ReLU() is a module placed between the MLP's two Linear layers so that nn.Sequential can execute it
+
+        - F.relu(x) acts after the complete convolution, including the MLP's second Linear layer, whose output can contain negative values
+
+    - global_add_pool(x, batch) sums the final node representations separately for each graph, producing one 64-feature graph vector
+
+    - self.classifier is Linear(hidden_dim, num_classes), mapping each graph vector to two raw class logits
+
+    - No output softmax is added because the shared cross-entropy calculation expects raw logits; edge features remain excluded from the model inputs
+
+- Used the GIN formulation from How Powerful Are Graph Neural Networks?, particularly Sections 4.1 and 4.2
+
+    - The paper motivates sum aggregation and MLPs through injectivity, meaning that distinct inputs produce distinct outputs
+
+    - Its expressiveness results depend on assumptions including countable feature domains, bounded multiset sizes, sufficiently expressive aggregation and readout functions, and sufficient message-passing depth
+
+    - Arbitrary sums of learned vectors are not automatically injective, and an MLP cannot recover a distinction already lost when its inputs were combined
+
+    - With epsilon fixed at zero, swapping the receiving node's vector with a neighbour's vector leaves their combined sum unchanged, illustrating that the self and neighbour roles are not always distinguishable
+
+    - This implementation is a two-message-passing-layer GIN-0 adaptation with width 64, external ReLUs and final-layer sum readout
+
+    - It does not concatenate readouts from every layer as proposed in the paper, and its construction alone does not establish all of the paper's theoretical guarantees or guarantee better classification accuracy
+
+- Added experiments/models/inspect_gin.py using the existing inspection structure and printing style
+
+    - Printed the model to expose both internal Sequential networks and their Linear and ReLU operations
+
+    - Used model.named_parameters() to inspect the learned tensor names, shapes and parameter counts
+
+    - Names such as conv1.nn.0.weight identify the first convolution, its internal network and the module at position 0
+
+    - Position 1 contains ReLU and has no parameters; position 2 contains the second Linear layer
+
+    - Added model.named_buffers() to inspect the fixed epsilon tensors separately from the parameters
+
+    - Traced the convolution, activation, pooling and classifier shapes individually, then called model(...) separately to exercise the complete forward method
+
+- Ran python -m experiments.models.inspect_gin
+
+    - The first batch contained 32 graphs and 585 nodes, giving input shape [585, 7]
+
+    - conv1 produced [585, 64]; the first external ReLU, conv2 and second external ReLU retained [585, 64]
+
+    - Sum pooling produced [32, 64], and the classifier produced [32, 2]
+
+    - The complete model call also returned [32, 2], confirming a successful forward pass with two logits per graph
+
+    - The first MLP contained (64 × 7 + 64) + (64 × 64 + 64) = 4672 parameters
+
+    - The second MLP contained 2 × (64 × 64 + 64) = 8320 parameters
+
+    - The classifier contained 2 × 64 + 2 = 130 parameters, giving 13122 parameters in total
+
+    - conv1.eps and conv2.eps each appeared as a buffer with shape [1] and value tensor([0.])
+
+    - These two stored values are excluded from the parameter count because they are buffers, not learned parameters
+
+- Updated experiments/train.py to import and construct GIN and record settings["model"] as "GIN"
+
+    - The constructor selects the implemented model, while the settings entry identifies it in the recorded settings and result filename
+
+    - Reused train_model and evaluate through the same model(x, edge_index, batch) interface
+
+    - Retained MUTAG, width 64, Adam learning rate 0.01, weight decay 0.0005, batch size 32, training seed 0 and split seed 0
+
+    - Retained exactly 1000 epochs without early stopping, minimum-validation-loss selection, earliest exact ties and restoration of the cloned selected state
+
+- Ran the GIN development fit through python -m experiments.train using CUDA
+
+    - Used 150 training graphs, 18 validation graphs and 20 development-test graphs
+
+    - Completed all 1000 epochs and selected epoch 187
+
+    - Selected validation loss was 0.1833 and validation accuracy was 0.9444, corresponding to 17 of 18 validation graphs correct
+
+    - Epoch 187 could be selected even though it was absent from the printed progress lines because validation is evaluated every epoch and progress is printed every ten epochs
+
+    - At epoch 1000, training loss was 0.1779, training accuracy was 0.9133, validation loss was 0.5461 and validation accuracy was 0.8889
+
+    - The final epoch had worse validation loss than the selected epoch, so its parameters were replaced by the preserved epoch-187 state before development-test assessment
+
+    - The printed trajectory showed substantial fluctuations, including training loss 1.0930 and validation loss 1.1731 at epoch 830, followed by lower values at epoch 840
+
+        - Training was not monotonic; the printed metrics alone do not identify the precise cause of that fluctuation
+
+        - Later deterioration did not overwrite the selected state because replacement requires strictly lower validation loss
+
+    - After selected-state restoration, development-test loss was 0.3646 and accuracy was 0.7500, corresponding to 15 of 20 graphs correct
+
+    - The validation and development-test scores concern different small partitions, with validation also used for epoch selection; their difference does not by itself identify an implementation error
+
+    - This remains preliminary evidence from one development partition and fit, not final cross-validation evidence or a basis for changing the fixed configuration
+
+- Saved the development record to results/development_gin_mutag_seed0.json
+
+    - The runner reported source commit b266b67dcc4d31b483fa188c55dd66d326e09689
+
+    - Total and trainable parameter counts were both 13122, consistent with the inspection and the fixed epsilon buffers being excluded
+
+    - Training-pass time was 38.5074 seconds, averaging approximately 0.0385 seconds per completed epoch
+
+    - The established timing convention includes loader iteration, device transfers, forward calculation, loss, backward calculation and optimiser updates, with CUDA synchronisation at the boundaries
+
+    - Validation, development-test assessment and result writing are excluded, so this is training-pass time rather than the complete command duration
+
+- 3.3 added GIN classifier and recorded MUTAG development fit
+
+
+
+
+
