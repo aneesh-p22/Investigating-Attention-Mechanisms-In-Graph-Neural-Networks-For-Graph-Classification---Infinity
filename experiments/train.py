@@ -124,7 +124,11 @@ def main():
         ).to(device)
 
         optimizer = Adam(
-            model.parameters(),
+            (
+                parameter
+                for parameter in model.parameters()
+                if parameter.requires_grad
+            ),
             lr=current_settings["learning_rate"],
             weight_decay=current_settings["weight_decay"],
         )

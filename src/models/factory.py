@@ -33,6 +33,10 @@ def build_model(settings, num_features, num_classes):
             settings["hidden_dim"],
             num_classes,
             heads=settings["heads"],
+            uniform_attention=settings.get(
+                "uniform_attention",
+                False,
+            ),
         )
 
     elif settings["model"] == "GATv2":

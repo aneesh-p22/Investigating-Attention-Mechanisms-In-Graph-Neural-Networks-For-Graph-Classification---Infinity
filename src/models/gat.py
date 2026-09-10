@@ -1,10 +1,18 @@
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.nn import GATConv, global_add_pool
 
 
 class GAT(nn.Module):
-    def __init__(self, num_features, hidden_dim, num_classes, heads):
+    def __init__(
+        self,
+        num_features,
+        hidden_dim,
+        num_classes,
+        heads,
+        uniform_attention=False,
+    ):
         super().__init__()
 
         if heads < 1 or hidden_dim % heads != 0:
@@ -44,6 +52,20 @@ class GAT(nn.Module):
             hidden_dim,
             num_classes,
         )
+
+        self.uniform_attention = uniform_attention
+
+        if uniform_attention:
+            with torch.no_grad():
+                self.conv1.att_src.zero_()
+                self.conv1.att_dst.zero_()
+                self.conv2.att_src.zero_()
+                self.conv2.att_dst.zero_()
+
+            self.conv1.att_src.requires_grad_(False)
+            self.conv1.att_dst.requires_grad_(False)
+            self.conv2.att_src.requires_grad_(False)
+            self.conv2.att_dst.requires_grad_(False)
 
     def forward(self, x, edge_index, batch):
         x = self.conv1(x, edge_index)
