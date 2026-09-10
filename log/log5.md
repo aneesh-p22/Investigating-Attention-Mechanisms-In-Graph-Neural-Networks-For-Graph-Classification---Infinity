@@ -318,7 +318,7 @@
 
     - This simplifies to:
 
-        - e(q, k) = -1.2|q - k|
+        - e(q, k) = -0.8|q - k|
 
     - A key closer to the query therefore receives the larger score
 
@@ -332,13 +332,13 @@
 
         - e(0, 0) = 0
 
-        - e(0, 2) = -2.4
+        - e(0, 2) = -1.6
 
         - k_0 receives the larger score
 
     - For query q = 2:
 
-        - e(2, 0) = -2.4
+        - e(2, 0) = -1.6
 
         - e(2, 2) = 0
 

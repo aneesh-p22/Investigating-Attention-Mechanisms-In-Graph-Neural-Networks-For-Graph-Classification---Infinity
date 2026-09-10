@@ -17,7 +17,7 @@ from src.training import train_model
 
 settings = {
     "variant": None,
-    "dataset": "MUTAG",
+    "dataset": "PROTEINS",
     "hidden_dim": 64,
     "learning_rate": 0.01,
     "weight_decay": 0.0005,
@@ -41,7 +41,7 @@ model_settings = {
 }
 
 selected_models = [
-    "GATv2",
+    "GCN",
 ]
 
 
