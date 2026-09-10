@@ -845,3 +845,199 @@
     - Stage 5.3 will define the minimal core ablation variants without creating a general experiment framework
 
 - Commit: 5.2 added GATv2 and recorded its development fit
+
+
+
+
+
+# 5.3 Minimal Ablation Runner
+
+- Defined the minimal set of core attention variants before building the final cross-validation runner
+
+    - Added experiments/ablation.py
+
+    - Kept the file deliberately small rather than creating a general experiment framework
+
+    - The runner currently defines and inspects the configurations that will be used for the three confirmed attention research questions
+
+    - No model fitting or assessment-data evaluation is performed by this substage
+
+    - Final cross-validation execution will be connected only after the shared final evaluation machinery exists in Stage 6
+
+- Reused the existing shared settings rather than duplicating the training configuration
+
+    - Imported settings and model_settings from experiments/train.py
+
+    - Importing the file does not start a development run because its execution is protected by the main guard
+
+    - Copied the common settings into base_settings
+
+    - This preserves the existing hidden width, optimiser settings, epoch count, batch size and seed configuration
+
+    - Variant dictionaries then override only settings that genuinely differ for the corresponding comparison
+
+    - This avoids creating a second independently editable copy of the common experimental configuration
+
+- Defined the RQ1 fixed-width head-count variants
+
+    - Added standard GAT configurations with one, two, four and eight first-layer heads
+
+    - Kept hidden_dim=64 for every configuration
+
+    - The GAT constructor derives the number of channels per head by dividing hidden_dim by heads
+
+    - The inspected one-head configuration produced:
+
+        - 64 channels per head
+
+        - First-layer width 64
+
+        - Final embedding width 64
+
+    - The inspected two-head configuration produced:
+
+        - 32 channels per head
+
+        - First-layer width 64
+
+        - Final embedding width 64
+
+    - The inspected four-head configuration produced:
+
+        - 16 channels per head
+
+        - First-layer width 64
+
+        - Final embedding width 64
+
+    - The inspected eight-head configuration produced:
+
+        - Eight channels per head
+
+        - First-layer width 64
+
+        - Final embedding width 64
+
+    - RQ1 therefore varies the partition of a fixed 64-dimensional first-layer representation across attention heads
+
+    - It does not vary the total first-layer representation width
+
+    - The second GAT layer remains one 64-channel head through the existing model definition
+
+- Assigned explicit variant identities to the additional RQ1 fits
+
+    - The one-head GAT uses variant heads1
+
+    - The two-head GAT uses variant heads2
+
+    - The four-head GAT uses variant heads4
+
+    - These are marked as additional CV fits
+
+    - The ordinary eight-head GAT keeps variant=None
+
+    - The eight-head configuration is marked for reuse of the standard reference GAT CV results
+
+    - This prevents a scientifically redundant second eight-head GAT fit under an ablation-specific filename
+
+- Defined reuse of the standard GATv2 reference for RQ2
+
+    - Added the standard GATv2 configuration to the core variant definitions
+
+    - Retained heads=8
+
+    - Retained share_weights=False
+
+    - Retained variant=None
+
+    - Marked the configuration for reuse of the standard GATv2 reference CV results
+
+    - RQ2 will therefore compare the ordinary reference GAT and ordinary reference GATv2 results rather than create duplicate ablation runs
+
+- Predeclared the RQ3 uniform-attention condition
+
+    - Added a GAT variant named uniform
+
+    - Added uniform_attention=True to its scientific settings
+
+    - Retained the standard eight-head GAT width configuration
+
+        - Eight heads
+
+        - Eight channels per head
+
+        - First-layer width 64
+
+        - Final embedding width 64
+
+    - Marked the uniform condition as requiring an additional CV fit
+
+    - The uniform_attention setting currently identifies the intended experimental condition only
+
+    - Stage 5.4 will implement and verify the actual uniform-attention constraint before this variant can be trained
+
+- Kept execution metadata separate from scientific model settings
+
+    - Each variant records whether it requires an additional CV fit or can reuse a reference result
+
+    - This is stored as runner metadata through reuse_reference
+
+    - reuse_reference is not inserted into the effective scientific settings dictionary
+
+    - It therefore does not become part of the model configuration or result settings
+
+    - In contrast, uniform_attention is part of the scientific settings because it will change how the uniform GAT is constructed and trained
+
+- Inspected the current result-path identities
+
+    - Used the shared get_result_path function rather than reproducing filename construction inside the ablation runner
+
+    - The one-head configuration currently maps to results/final_gat_mutag_heads1_seed0.json
+
+    - The two-head configuration currently maps to results/final_gat_mutag_heads2_seed0.json
+
+    - The four-head configuration currently maps to results/final_gat_mutag_heads4_seed0.json
+
+    - The eight-head reference currently maps to results/final_gat_mutag_seed0.json
+
+    - The GATv2 reference currently maps to results/final_gatv2_mutag_seed0.json
+
+    - The uniform GAT currently maps to results/final_gat_mutag_uniform_seed0.json
+
+    - The standard reference models correctly contain no unnecessary variant suffix
+
+    - The additional ablation conditions are distinguished by their variant suffixes
+
+- Recorded the current limitation of the displayed final paths
+
+    - The existing result recorder currently represents purpose, model, dataset, variant and seed
+
+    - Final cross-validation fold identities have not yet been implemented
+
+    - The printed final paths are therefore inspections of the current model and variant naming flow rather than the locked Stage 7 assessment filenames
+
+    - Stage 6 will extend the common final-result machinery with the required fold information
+
+    - The ablation runner will use that shared machinery rather than implement an independent naming system
+
+- Recorded the scope of this substage
+
+    - The confirmed core attention comparisons now have explicit machine-readable configurations
+
+    - RQ1 has fixed-width one, two, four and eight-head GAT configurations
+
+    - The standard eight-head GAT result is designated for reuse rather than duplicate training
+
+    - The standard GATv2 result is designated for reuse in RQ2
+
+    - The uniform GAT has been predeclared as a separate RQ3 training condition
+
+    - No general experiment framework was introduced
+
+    - No development or final model was trained
+
+    - No assessment result was inspected
+
+    - Stage 5.4 will implement and verify the uniform-attention GAT condition
+
+- Commit: 5.3 added the minimal core ablation runner
