@@ -475,3 +475,373 @@
     - Stage 5.2 will connect the GATv2 formulation to the installed GATv2Conv implementation, inspect its parameterisation and add the standard GATv2 model to the common training pipeline
 
 - Commit: 5.1 documented static and dynamic graph attention
+
+
+
+
+
+# 5.2 Standard GATv2 and Development Fit
+
+- Studied the GATv2 implementation before adding it to the common graph-classification pipeline
+
+    - Used How Attentive Are Graph Attention Networks? together with the installed PyG GATv2Conv implementation
+
+    - Kept the distinction between the general GATv2 formulation and the parameter-matched experimental restriction used in the paper
+
+        - The paper's reported GATv2 experiments constrained the receiver and sender transformations to be shared
+
+        - This was used to prevent an increased parameter count from explaining the reported GATv2 and GAT differences
+
+        - The project instead uses the standard general-form GATv2 with separate receiver and sender transformations
+
+        - This is represented by share_weights=False
+
+    - The project therefore does not claim to reproduce the paper's parameter-matched experimental systems
+
+    - RQ2 instead compares GAT and general-form GATv2 within the project's matched graph-classification pipeline while reporting their remaining parameterisation differences
+
+- Inspected the installed GATv2Conv implementation
+
+    - Confirmed the installed PyG version was 2.8.0.post1
+
+    - Inspected the GATv2Conv constructor signature
+
+    - Confirmed the relevant defaults and available options included:
+
+        - heads=1
+
+        - concat=True
+
+        - negative_slope=0.2
+
+        - dropout=0.0
+
+        - add_self_loops=True
+
+        - edge_dim=None
+
+        - bias=True
+
+        - share_weights=False
+
+        - residual=False
+
+    - Inspected the constructor implementation
+
+        - lin_l transforms one side of the receiver-sender pair
+
+        - lin_r transforms the other side
+
+        - When share_weights=True, lin_r refers to the same transformation as lin_l
+
+        - When share_weights=False, a separate lin_r transformation is constructed
+
+        - Each transformation contains its own weight and, with bias=True, its own bias
+
+        - The layer also contains a learned attention tensor and an output bias
+
+    - Inspected edge_update
+
+        - The transformed receiver and sender representations are added before attention scoring
+
+        - LeakyReLU is applied to the resulting vector
+
+        - The learned attention tensor is applied after this vector nonlinearity and summed across the output-channel dimension
+
+        - Neighbourhood softmax then normalises the scalar scores for each receiving node
+
+        - Attention dropout is applied after softmax, but the project uses dropout=0.0
+
+    - This ordering matches the GATv2 mechanism studied in 5.1
+
+        - Receiver and sender information interact before the final scalar attention projection
+
+        - The standard GAT scalar decomposition responsible for static ranking therefore does not generally apply
+
+- Implemented the project's standard GATv2 classifier
+
+    - Added src/models/gatv2.py
+
+    - Used two GATv2Conv layers followed by the same graph-classification structure used by the other models
+
+    - The first layer takes the loaded node features and produces total width 64
+
+        - Eight heads are used
+
+        - Each head produces eight channels
+
+        - Concatenating eight heads gives 64 output channels
+
+    - The second layer takes 64 input channels and produces 64 output channels
+
+        - It uses one head
+
+        - concat=False retains the required final node-embedding width
+
+    - Used share_weights=False in both GATv2 layers
+
+    - Retained the shared attention settings:
+
+        - LeakyReLU negative slope 0.2 inside attention scoring
+
+        - Zero attention-coefficient dropout
+
+        - Self connections enabled
+
+        - No edge-feature scoring
+
+        - Bias enabled
+
+        - No residual transformation
+
+    - Applied ReLU after each complete convolution
+
+    - Used global sum pooling and the same linear graph classifier
+
+    - The model returns raw graph logits
+
+- Connected GATv2 to the shared model construction and development settings
+
+    - Added GATv2 to the common model builder
+
+    - Kept heads and share_weights explicit rather than hiding the scientific configuration inside the model
+
+    - Added the GATv2 model settings:
+
+        - heads=8
+
+        - share_weights=False
+
+    - Retained the common development settings
+
+        - hidden_dim=64
+
+        - learning rate 0.01
+
+        - weight decay 0.0005
+
+        - batch size 32
+
+        - 1000 epochs
+
+        - training seed 0
+
+        - split seed 0
+
+    - No GATv2-specific hyperparameter search or development-score tuning was introduced
+
+- Added and ran the GATv2 model inspector
+
+    - Constructed GATv2 on MUTAG before training
+
+    - The model contained:
+
+        - GATv2Conv(7, 8, heads=8)
+
+        - GATv2Conv(64, 64, heads=1)
+
+        - Linear(64, 2)
+
+    - Inspected every learned parameter tensor
+
+    - The first convolution contained:
+
+        - att with shape [1, 8, 8] and 64 parameters
+
+        - output bias with shape [64] and 64 parameters
+
+        - lin_l weight with shape [64, 7] and 448 parameters
+
+        - lin_l bias with shape [64] and 64 parameters
+
+        - lin_r weight with shape [64, 7] and 448 parameters
+
+        - lin_r bias with shape [64] and 64 parameters
+
+    - The first convolution therefore contained 1152 parameters
+
+    - The second convolution contained:
+
+        - att with shape [1, 1, 64] and 64 parameters
+
+        - output bias with shape [64] and 64 parameters
+
+        - lin_l weight with shape [64, 64] and 4096 parameters
+
+        - lin_l bias with shape [64] and 64 parameters
+
+        - lin_r weight with shape [64, 64] and 4096 parameters
+
+        - lin_r bias with shape [64] and 64 parameters
+
+    - The second convolution therefore contained 8448 parameters
+
+    - The classifier contained 130 parameters
+
+    - The complete model therefore contained 9730 parameters
+
+    - Confirmed share_weights was False in both convolutions
+
+    - Confirmed lin_l and lin_r were distinct transformation objects in both convolutions
+
+    - The larger parameter count relative to GAT is therefore an actual consequence of the selected separate-transform GATv2 parameterisation
+
+- Inspected the GATv2 tensor shapes through the graph-classification pipeline
+
+    - The inspected batch contained 585 nodes from 32 MUTAG graphs
+
+    - Input node features had shape [585, 7]
+
+    - The first convolution produced [585, 64]
+
+    - The first ReLU retained [585, 64]
+
+    - The second convolution produced [585, 64]
+
+    - The second ReLU retained [585, 64]
+
+    - Global sum pooling produced [32, 64]
+
+    - The classifier produced [32, 2]
+
+    - The complete model forward pass also returned [32, 2]
+
+    - This confirmed that GATv2 preserves the common width, readout and classifier interface expected by the shared training code
+
+- Inspected the untrained attention output
+
+    - The original batch edge index had shape [2, 1304]
+
+    - Both GATv2 layers returned an edge index with shape [2, 1889]
+
+    - The increase of 585 entries matched the 585 nodes in the batch
+
+        - This was consistent with one effective self connection being included for each node
+
+    - The first layer returned attention coefficients with shape [1889, 8]
+
+        - One coefficient was returned for every effective edge entry and each of the eight heads
+
+    - The second layer returned attention coefficients with shape [1889, 1]
+
+        - One coefficient was returned for every effective edge entry because the layer has one head
+
+    - Inspected receiver node 0
+
+        - Its eligible incoming entries were from senders 1, 5 and itself
+
+    - The untrained first-layer coefficients were approximately one third for all three entries in every displayed head
+
+    - The untrained second-layer coefficients were also approximately one third for the three entries
+
+    - The incoming coefficients summed to one separately for every head
+
+    - This established the expected neighbourhood softmax normalisation for the inspected example
+
+    - The equal values were an observation from this fresh untrained model and were not interpreted as a general property of GATv2 or as evidence about learned attention
+
+- Committed the implemented GATv2 source before recording its development fit
+
+    - This ensured the result could record the source state that actually produced the training run
+
+    - The recorded source commit was 513d6d1c6630eec657db5241a63191a4703f41dd
+
+    - This avoids fitting from scientifically relevant uncommitted source changes
+
+- Recorded the representative GATv2 development fit on MUTAG
+
+    - Used the existing stratified development partition
+
+        - 150 training graphs
+
+        - 18 validation graphs
+
+        - 20 development-test graphs
+
+    - Used CUDA
+
+    - Trained for all 1000 fixed epochs
+
+        - No early stopping was used
+
+        - Validation was evaluated after every epoch
+
+        - Console progress was printed every ten epochs
+
+    - Selected the model state using strict minimum validation cross-entropy
+
+    - The selected state occurred at epoch 823
+
+        - Epoch 823 was not displayed in the ten-epoch progress output because model selection still operated on every epoch
+
+    - The selected validation loss was 0.2357
+
+    - The selected validation accuracy was 0.8333
+
+    - Some other epochs had higher validation accuracy
+
+        - This does not affect checkpoint selection because validation loss, rather than validation accuracy, is the predefined selection criterion
+
+    - Restored the selected state before development-test evaluation
+
+    - Development-test loss was 0.4311
+
+    - Development-test accuracy was 0.8000
+
+    - The complete model contained 9730 total parameters
+
+    - All 9730 parameters were trainable
+
+    - Measured training time was 46.5741 seconds
+
+    - Mean measured training time was 0.0466 seconds per epoch
+
+    - Saved the selected model state to results/development_gatv2_mutag_seed0.pt
+
+    - Saved the paired result record to results/development_gatv2_mutag_seed0.json
+
+- Interpreted the development result within its intended scope
+
+    - The fit establishes that general-form GATv2 can be constructed, trained, validation-selected, restored, evaluated and persistently saved through the same project pipeline as the existing models
+
+    - The development result is implementation evidence rather than final RQ2 assessment evidence
+
+    - The earlier development GAT and current GATv2 runs can provide contextual checks but do not form the final controlled comparison
+
+    - In these development runs, both models obtained development-test accuracy 0.8000
+
+    - GATv2 had selected validation loss 0.2357 compared with the earlier GAT value 0.2423
+
+    - GATv2 had selected validation accuracy 0.8333 compared with the earlier GAT value 0.9444
+
+    - GATv2 had development-test loss 0.4311 compared with the earlier GAT value 0.4058
+
+    - These mixed observations give no justified development-stage claim that either attention formulation is superior
+
+    - The final RQ2 comparison will require the predefined final evaluation procedure across the complete adopted dataset set
+
+    - GATv2's greater theoretical attention expressiveness does not guarantee higher graph-classification accuracy
+
+    - The GAT and GATv2 models also do not have equal parameter counts under the project's general-form share_weights=False choice
+
+        - This remaining capacity difference must be disclosed when interpreting RQ2
+
+        - The common representation width will not be distorted merely to force parameter equality
+
+- Recorded the scope of this substage
+
+    - Standard general-form GATv2 is now part of the common graph-classification pipeline
+
+    - Its installed scoring implementation, transformation sharing behaviour, biases and parameter count were explicitly inspected
+
+    - Its common tensor interface and local attention normalisation were checked before training
+
+    - One validation-selected MUTAG development state and result record were preserved
+
+    - No final RQ2 conclusion was drawn from the development fit
+
+    - No additional trained-neighbourhood GATv2 inspector was added because this substage did not require another local trained example
+
+    - Stage 5.3 will define the minimal core ablation variants without creating a general experiment framework
+
+- Commit: 5.2 added GATv2 and recorded its development fit

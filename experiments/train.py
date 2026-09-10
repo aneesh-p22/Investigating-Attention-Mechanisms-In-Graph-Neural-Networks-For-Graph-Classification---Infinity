@@ -34,10 +34,14 @@ model_settings = {
     "GAT": {
         "heads": 8,
     },
+    "GATv2": {
+        "heads": 8,
+        "share_weights": False,
+    },
 }
 
 selected_models = [
-    "GAT",
+    "GATv2",
 ]
 
 
