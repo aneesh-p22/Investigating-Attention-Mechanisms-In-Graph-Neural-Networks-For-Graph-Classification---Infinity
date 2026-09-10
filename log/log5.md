@@ -474,4 +474,4 @@
 
     - Stage 5.2 will connect the GATv2 formulation to the installed GATv2Conv implementation, inspect its parameterisation and add the standard GATv2 model to the common training pipeline
 
-- 5.1 documented static and dynamic graph attention
+- Commit: 5.1 documented static and dynamic graph attention
