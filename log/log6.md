@@ -133,3 +133,147 @@
 - The restored selected state was saved as results/development_gcn_proteins_seed0.pt and its settings, partitions, selection evidence, development-test metrics, parameter counts, runtime, device and source provenance were saved as results/development_gcn_proteins_seed0.json.
 
 - Commit: 6.1 inspected PROTEINS and recorded its development fit
+
+
+
+
+
+# 6.2 NCI1 Inspection and Development Pass
+
+- Added experiments/datasets/inspect_nci1.py to inspect the third core graph-classification dataset before its recorded development fit.
+
+    - load_dataset("NCI1") used the existing common TUDataset loading path, preserving the same cleaned=False, use_node_attr=False and use_edge_attr=False dataset policy already used for MUTAG and PROTEINS.
+
+    - dataset.num_node_features reported the width of the node-feature vectors actually supplied to the models, while dataset.num_node_labels and dataset.num_node_attributes distinguished categorical node-label channels from separately available continuous attributes.
+
+    - NCI1 has a much larger categorical node vocabulary than the earlier datasets, so the inspection checked the structure of the complete vocabulary rather than assigning unsupported meanings to individual channels.
+
+    - argmax(dim=1) identified the active position in each one-hot node-feature row. unique() then retained each occurring channel index once and sort() placed those indices in numerical order.
+
+    - A dataset-wide one-hot check separately verified that every entry was either 0 or 1 and that every node-feature row summed to exactly 1. This distinguishes a genuinely one-hot categorical representation from merely observing vectors that happen to have width 37.
+
+- The command python -m experiments.datasets.inspect_nci1 loaded NCI1 successfully and reported 4,110 graphs in two processed target classes.
+
+    - Class 0 contained 2,053 graphs and class 1 contained 2,057 graphs, so the processed dataset is almost exactly balanced between its two classes.
+
+    - The graph task was recorded as chemical-compound activity classification for non-small-cell lung cancer screening.
+
+    - Nodes were represented as categorically labelled atoms and edges represented molecular connectivity.
+
+    - No active or inactive biological meaning was assigned to numeric class IDs 0 and 1 because the inspection established the processed numeric targets but not their semantic mapping.
+
+- NCI1 loaded 37 categorical node-feature channels and no continuous node attributes.
+
+    - The complete dataset contained 37 distinct node-feature rows.
+
+    - Every loaded row passed the one-hot check.
+
+    - The active channel indices covered every integer from 0 through 36, confirming that all 37 categorical channels occur somewhere in NCI1.
+
+    - A 37-channel vocabulary does not mean that every graph contains all 37 categories. Each node occupies one active channel, and individual graphs may use only a subset of the dataset-wide vocabulary.
+
+    - The categorical indices are specific to NCI1's encoding. Their chemical identities were not inferred from the channel meanings established previously for MUTAG.
+
+- NCI1 contained no loaded edge-feature information.
+
+    - Loaded edge features, edge label channels and continuous edge attributes were all reported as zero.
+
+    - edge_attr was None for both representative graphs and for the inspected minibatch.
+
+    - The principal models therefore use molecular connectivity through edge_index, with no edge-feature tensor available to the model on this dataset.
+
+- One representative graph from each processed target class was inspected.
+
+    - Dataset index 0 had target tensor([0]), 21 nodes, x shape [21, 37] and edge_index shape [2, 42].
+
+    - Its nodes used categorical channels 0, 1 and 2.
+
+    - Dataset index 1650 had target tensor([1]), 36 nodes, x shape [36, 37] and edge_index shape [2, 76].
+
+    - Its nodes used categorical channels 0, 1, 2 and 4.
+
+    - These examples show how the shared 37-dimensional vocabulary is used sparsely within individual molecular graphs while retaining one common input dimension for the model.
+
+- Dataset-wide graph sizes were also inspected because they affect batching and computational cost.
+
+    - Graphs contained between 3 and 111 nodes, with a mean of 29.87 nodes.
+
+    - Stored edge entries ranged from 4 to 238, with a mean of 64.60.
+
+    - Every graph had node-feature width 37 and edge-feature width 0.
+
+    - These values are counts from the PyG representation. Stored edge entries were not reinterpreted as a count of unique undirected chemical bonds.
+
+- A deterministic DataLoader batch of 32 graphs contained 707 nodes.
+
+    - x had shape [707, 37], so the node rows from all 32 graphs were concatenated while retaining the 37-dimensional NCI1 feature representation.
+
+    - edge_index had shape [2, 1502].
+
+    - y had shape [32], providing one target for every graph in the batch.
+
+    - batch had shape [707] and contained graph IDs 0 through 31, assigning each concatenated node row to its original graph within the minibatch.
+
+    - ptr contained 33 cumulative node boundaries. Its opening values 0, 21, 45 and 74 show that the first graph contributes 21 nodes, the second contributes 24 and the third contributes 29.
+
+    - All 32 graph targets in this inspected minibatch were class 0 because shuffle=False preserved the ordering of the first dataset entries. The training loader uses shuffle=True, so this deterministic inspection batch is not the training batch distribution.
+
+- stratified_split was applied with the established split seed 0.
+
+    - Training contained 3,287 graphs with class counts [1642, 1645].
+
+    - Validation contained 410 graphs with class counts [205, 205].
+
+    - Development test contained 413 graphs with class counts [206, 207].
+
+    - The near-equal class counts in each partition follow from the near-balanced complete dataset and the existing class-wise approximately 80/10/10 allocation.
+
+- experiments/train.py was configured for one ordinary GCN development fit on NCI1.
+
+    - Only the selected dataset changed from the preceding PROTEINS development fit.
+
+    - hidden_dim remained 64.
+
+    - Adam retained learning rate 0.01 and weight decay 0.0005.
+
+    - The fixed budget remained 1,000 epochs with batch size 32, training seed 0 and split seed 0.
+
+    - Validation continued to select the earliest state attaining the strict minimum graph-mean validation cross-entropy after each epoch, without early stopping.
+
+- The recorded fit ran on CUDA from source commit 8b0203ab11ddc92a893b786cf4de38070eca841d.
+
+    - The selected state occurred at epoch 6.
+
+    - Its validation loss was 0.6116 and its validation accuracy was 0.6780.
+
+    - Progress is printed only every ten epochs, while validation selection occurs after every epoch. The selected epoch therefore occurs before the first displayed training-progress line without indicating any inconsistency.
+
+    - Training still completed all 1,000 epochs. The early selected state records the minimum validation-loss state rather than terminating optimisation.
+
+- The restored selected state obtained development-test loss 0.5912 and development-test accuracy 0.6901.
+
+    - This is development evidence showing that the existing graph-classification and selected-state pipeline operates correctly on NCI1.
+
+    - The result is not final cross-validation evidence and was not used to revise the shared architecture, optimiser or training settings.
+
+- The NCI1 GCN contained 6,722 parameters, all of which were trainable.
+
+    - The first GCN layer maps 37 input channels to 64 outputs, giving 37 × 64 = 2,368 weight parameters and 64 bias parameters, for 2,432 parameters.
+
+    - The second GCN layer contains 64 × 64 = 4,096 weight parameters and 64 bias parameters, for 4,160 parameters.
+
+    - The graph classifier contains 64 × 2 = 128 weight parameters and 2 bias parameters, for 130 parameters.
+
+    - The total is 2,432 + 4,160 + 130 = 6,722.
+
+    - PROTEINS supplied three input channels whereas NCI1 supplies 37. The additional 34 input channels therefore contribute 34 × 64 = 2,176 additional first-layer weights, exactly accounting for the difference between the 4,546-parameter PROTEINS GCN and the 6,722-parameter NCI1 GCN.
+
+- The measured training-pass time was 659.9765 seconds, with a mean of 0.6600 seconds per epoch.
+
+    - The same established runtime convention applies, covering the training-pass operations while excluding validation, development-test evaluation, selected-state copying and restoration, progress printing, model-state saving and result writing.
+
+    - NCI1 is therefore materially more expensive under the same development procedure than the preceding PROTEINS run. This observed runtime is retained for Stage 6 experiment-budget planning rather than used to change the scientific protocol.
+
+- The restored selected state was saved as results/development_gcn_nci1_seed0.pt and the associated settings, complete development partitions, selection evidence, development-test metrics, parameter counts, runtime, device and source provenance were saved as results/development_gcn_nci1_seed0.json.
+
+- Commit: 6.2 inspected NCI1 and recorded its development fit
