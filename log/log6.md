@@ -277,3 +277,177 @@
 - The restored selected state was saved as results/development_gcn_nci1_seed0.pt and the associated settings, complete development partitions, selection evidence, development-test metrics, parameter counts, runtime, device and source provenance were saved as results/development_gcn_nci1_seed0.json.
 
 - Commit: 6.2 inspected NCI1 and recorded its development fit
+
+
+
+
+
+# 6.3 Run Budget and Final Scope
+
+- Fixed the final investigation at four connected research questions across MUTAG, PROTEINS and NCI1.
+
+    - RQ1 studies first-layer GAT head count while holding total first-layer representation width at 64.
+
+    - RQ2 compares the reference GAT with standard general-form GATv2 under the matched graph-classification pipeline.
+
+    - RQ3 compares the learned reference GAT with a fresh GAT trained under uniform neighbourhood attention.
+
+    - RQ4 characterises how far fitted reference-GAT attention departs from uniform weighting and measures the sensitivity of the same fitted model to replacing learned attention scoring with uniform weighting without retraining.
+
+    - The questions form one progression through head organisation, attention scoring, learning non-uniform weighting and the realised behaviour of fitted attention.
+
+- Fixed MUTAG, PROTEINS and NCI1 as the complete final dataset set.
+
+    - All four research questions use these same three datasets.
+
+    - No additional dataset is included in the final assessment matrix.
+    
+- Retained all nine planned final configurations.
+
+    - The contextual models are GCN, GraphSAGE and GIN.
+
+    - The principal attention configurations are GAT with 1, 2, 4 and 8 first-layer heads, GATv2 and uniform-attention GAT.
+
+    - The eight-head GAT is the reference GAT and is reused across the research questions where appropriate.
+
+    - GraphSAGE and GIN remain part of the reference comparison rather than being removed to reduce computational cost.
+
+- Reconsidered the original 1,000-epoch final allowance prospectively using development-only convergence evidence.
+
+    - The original 1,000-epoch allowance was retained for a systematic audit so that shorter common budgets could be compared against the best validation state available under the previous maximum.
+
+    - The audit covered all nine final configurations on all three final datasets, giving 27 development trajectories.
+
+    - Every trajectory used the existing development training and validation partitions and ran for the complete 1,000-epoch allowance.
+
+    - Development-test results and future final-test results were not used to choose the epoch budget.
+
+    - The audit recorded the best validation state available by epochs 100, 250, 500 and 1,000.
+
+    - The clean rerun completed all 27 trajectories in 7,928.40 seconds, approximately 2.20 hours, on the recorded CUDA device.
+
+    - By epoch 500, 16 of the 27 trajectories had already reached exactly the same minimum validation loss later available by epoch 1,000.
+
+    - Across all 27 trajectories, the median 500-epoch validation-loss gap from the 1,000-epoch minimum was zero, the mean gap was approximately 0.00476 and the largest observed gap was approximately 0.06177.
+
+    - MUTAG GIN produced the largest observed 500-epoch gap, so the audit does not establish that every trajectory has converged by epoch 500.
+
+    - Later decreases in validation cross-entropy did not necessarily correspond to higher validation accuracy because state selection is defined by cross-entropy rather than accuracy.
+
+- Fixed the final training allowance at exactly 500 epochs for every final fit.
+
+    - The 500-epoch value is a common prospective computational budget supported by the development convergence audit.
+
+    - It substantially reduces computation while retaining much of the useful validation-loss convergence observed under the previous allowance.
+
+    - It is not a claim that every model or dataset reaches its absolute optimum within 500 epochs.
+
+    - There is no model-specific epoch allowance, patience rule or early stopping.
+
+    - Validation continues after every epoch and selects the strict minimum graph-mean validation cross-entropy within the complete 500-epoch allowance.
+
+    - An exact validation-loss tie retains the earlier epoch.
+
+    - Training continues through epoch 500 regardless of when the selected state occurs, after which the selected state is restored before outer-test assessment.
+
+- Fixed final assessment at stratified five-fold outer cross-validation.
+
+    - Fold IDs are 0 through 4 and every graph appears in the outer-test partition exactly once.
+
+    - Each outer-test fold contains approximately 20 percent of the complete dataset.
+
+    - Approximately 10 percent of the complete dataset is reserved for validation from the remaining approximately 80 percent, leaving approximately 70 percent for fitting.
+
+    - Reserving approximately one eighth of the outer training remainder for validation gives the intended approximately 70/10/20 fit, validation and outer-test allocation.
+
+    - Stage 6.4 will implement and verify the exact deterministic classwise allocation and integer rounding.
+
+    - Corresponding configurations use identical fold identities so comparisons are made on the same held-out graphs.
+
+    - One predetermined training realisation is used per configuration and fold rather than a seed search or repeated-initialisation grid.
+
+    - Final summaries retain all five fold values and report their arithmetic mean and sample standard deviation with ddof=1.
+
+- Fixed the complete final training matrix at 135 fits.
+
+    - Five reference configurations across three datasets and five folds give 75 fits: GCN, GraphSAGE, GIN, reference GAT and GATv2.
+
+    - The additional one-head, two-head and four-head GAT variants required by RQ1 give 45 fits.
+
+    - RQ2 requires no additional fits because it reuses the reference GAT and GATv2 results.
+
+    - Uniform-attention GAT contributes 15 fits for RQ3.
+
+    - RQ4 requires no additional optimisation fits because it reuses the 15 selected reference-GAT states.
+
+    - The total is therefore 75 + 45 + 15 = 135 final fits.
+
+    - At 500 epochs each, the final matrix contains 67,500 nominal fit-epochs compared with 270,000 under the earlier 270-fit, 1,000-epoch design.
+
+- Used the completed convergence audit to form a practical runtime estimate for the final matrix.
+
+    - The audit required approximately 2.20 hours for 27 trajectories of 1,000 epochs under the development partitions.
+
+    - Scaling that observation to five times as many fits at half as many epochs gives a first-order estimate of approximately 5.5 hours.
+
+    - Final fitting partitions are slightly smaller than the development training partitions, while final assessment, state saving and recording add other overhead.
+
+    - The estimate is therefore used only for planning and is not treated as a promised final wall time.
+
+- Fixed RQ4 as one connected fitted-attention investigation before final assessment.
+
+    - It uses the validation-selected reference eight-head GAT state from every dataset and outer fold, giving 15 fitted states.
+
+    - Only the corresponding outer-test graphs are analysed for each state, preserving complete out-of-fold graph coverage.
+
+    - Both GAT layers are analysed separately.
+
+    - For receiver i and head h with m_i greater than one incoming entries, normalised entropy is H_i,h = -sum_j alpha_i,j,h log(alpha_i,j,h) / log(m_i), and departure from uniformity is D_i,h = 1 - H_i,h.
+
+    - Uniform neighbourhood weighting gives D_i,h = 0.
+
+    - Receivers with only one incoming entry are excluded from the entropy calculation because no weighting choice exists and log(1) is zero. Their counts are retained.
+
+    - First-layer heads are averaged for the primary receiver-level quantity, eligible receivers are averaged within each graph, and graphs are weighted equally within each fold.
+
+    - The five fold-level values are retained and summarised using their arithmetic mean and sample standard deviation.
+
+- Fixed the second component of RQ4 as a fitted-model uniform-attention intervention.
+
+    - The same selected reference-GAT state and the same outer-test graphs are used before and after intervention.
+
+    - The intervention sets conv1.att_src, conv1.att_dst, conv2.att_src and conv2.att_dst to zero after loading the fitted state.
+
+    - No retraining occurs.
+
+    - The fitted message transformations, biases, classifier, topology, self connections and head organisation remain unchanged.
+
+    - Equal attention logits produce uniform softmax coefficients over the effective incoming entries.
+
+    - The predefined predictive endpoints are change in graph-mean cross-entropy, change in accuracy and prediction-flip rate.
+
+    - Cross-entropy change is intervention loss minus learned-attention loss.
+
+    - Accuracy change is intervention accuracy minus learned-attention accuracy.
+
+    - Prediction-flip rate is the proportion of held-out graphs whose predicted class changes after the intervention.
+
+    - Original graph identities, labels and predictions are retained so the two conditions remain aligned.
+
+    - The intervention measures fitted-model sensitivity and does not establish attention coefficients as faithful explanations or real-world causal importance.
+
+- Kept the final methodology focused on controlled comparison rather than model-specific benchmark optimisation.
+
+    - No final learning-rate, width, dropout, epoch or seed grid is introduced.
+
+    - Shared settings remain fixed so the attention-design comparisons take place under one declared pipeline.
+
+    - Conclusions will therefore concern behaviour under that matched pipeline rather than globally optimal performance for each model family.
+
+- The final dataset set, research questions, configurations, epoch budget and fold count are now fixed before final assessment.
+
+    - Stage 6.4 will implement the exact five-fold partition path, seed schedule, final runner and result-recording contract.
+
+    - No further dataset, research-question, model, fold-count or epoch-budget selection remains before implementation.
+
+- 6.3 fixed the experiment budget and final scope

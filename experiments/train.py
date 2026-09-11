@@ -17,7 +17,7 @@ from src.training import train_model
 
 settings = {
     "variant": None,
-    "dataset": "NCI1",
+    "dataset": "ENZYMES",
     "hidden_dim": 64,
     "learning_rate": 0.01,
     "weight_decay": 0.0005,
