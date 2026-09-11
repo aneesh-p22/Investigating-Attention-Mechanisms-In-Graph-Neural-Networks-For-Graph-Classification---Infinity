@@ -284,170 +284,744 @@
 
 # 6.3 Run Budget and Final Scope
 
-- Fixed the final investigation at four connected research questions across MUTAG, PROTEINS and NCI1.
+- Fixed the investigation at four connected research questions evaluated on MUTAG, PROTEINS and NCI1.
 
-    - RQ1 studies first-layer GAT head count while holding total first-layer representation width at 64.
+    - RQ1 asks how the number of first-layer GAT attention heads affects graph-classification performance when the total first-layer representation width remains fixed at 64.
 
-    - RQ2 compares the reference GAT with standard general-form GATv2 under the matched graph-classification pipeline.
+    - The compared head counts are 1, 2, 4 and 8. Their channels per head are therefore 64, 32, 16 and 8 respectively.
 
-    - RQ3 compares the learned reference GAT with a fresh GAT trained under uniform neighbourhood attention.
+    - RQ2 compares the standard eight-head reference GAT with standard general-form GATv2 under the same graph-classification pipeline.
 
-    - RQ4 characterises how far fitted reference-GAT attention departs from uniform weighting and measures the sensitivity of the same fitted model to replacing learned attention scoring with uniform weighting without retraining.
+    - RQ2 is a comparison between the two complete attention formulations rather than a parameter-matched causal isolation of dynamic ranking, because the standard GAT and GATv2 implementations do not have identical parameterisations.
 
-    - The questions form one progression through head organisation, attention scoring, learning non-uniform weighting and the realised behaviour of fitted attention.
+    - RQ3 compares the learned reference GAT with a fresh GAT trained while its neighbourhood attention coefficients are constrained to be uniform.
 
-- Fixed MUTAG, PROTEINS and NCI1 as the complete final dataset set.
+    - RQ4 examines the fitted reference GAT itself, first measuring how far its learned neighbourhood coefficients depart from uniform weighting and then measuring the sensitivity of its held-out predictions to replacing those learned coefficients with uniform weighting without retraining.
 
-    - All four research questions use these same three datasets.
+    - The four questions therefore progress through head organisation, scoring formulation, whether unequal weighting is useful during fitting, and what unequal weighting is actually learned by the fitted reference model.
 
-    - No additional dataset is included in the final assessment matrix.
-    
-- Retained all nine planned final configurations.
+- Fixed MUTAG, PROTEINS and NCI1 as the complete assessment dataset set.
 
-    - The contextual models are GCN, GraphSAGE and GIN.
+    - Every research question uses the same three datasets.
 
-    - The principal attention configurations are GAT with 1, 2, 4 and 8 first-layer heads, GATv2 and uniform-attention GAT.
+    - Using the same dataset set throughout keeps the different attention investigations directly comparable and avoids introducing a dataset change as an additional factor between research questions.
 
-    - The eight-head GAT is the reference GAT and is reused across the research questions where appropriate.
+    - No additional dataset is included in the assessment matrix.
 
-    - GraphSAGE and GIN remain part of the reference comparison rather than being removed to reduce computational cost.
+- Retained all nine planned model configurations.
 
-- Reconsidered the original 1,000-epoch final allowance prospectively using development-only convergence evidence.
+    - GCN, GraphSAGE and GIN remain contextual message-passing baselines.
 
-    - The original 1,000-epoch allowance was retained for a systematic audit so that shorter common budgets could be compared against the best validation state available under the previous maximum.
+    - GAT with 1, 2, 4 and 8 first-layer heads provides the RQ1 head-count comparison.
 
-    - The audit covered all nine final configurations on all three final datasets, giving 27 development trajectories.
+    - The eight-head GAT is the reference GAT used elsewhere in the investigation.
 
-    - Every trajectory used the existing development training and validation partitions and ran for the complete 1,000-epoch allowance.
+    - GATv2 provides the second principal learned-attention formulation.
 
-    - Development-test results and future final-test results were not used to choose the epoch budget.
+    - Uniform GAT retains the GAT transformations and classifier while constraining the attention-scoring parameters so that neighbourhood softmax coefficients are uniform.
 
-    - The audit recorded the best validation state available by epochs 100, 250, 500 and 1,000.
+    - GraphSAGE and GIN were retained rather than removing contextual models solely to reduce runtime, preserving a broader reference picture for the principal attention models.
 
-    - The clean rerun completed all 27 trajectories in 7,928.40 seconds, approximately 2.20 hours, on the recorded CUDA device.
+- Reconsidered the original 1,000-epoch assessment allowance before any cross-validation assessment results were produced.
+
+    - The decision was treated as a prospective protocol decision rather than reducing individual models after observing favourable or unfavourable assessment outcomes.
+
+    - A common epoch budget was retained across all configurations so training allowance itself does not become a model-specific experimental factor.
+
+    - A systematic development-only convergence audit was used to compare shorter common budgets against the best validation state available under the previous 1,000-epoch allowance.
+
+- experiments/inspections/inspect_epoch_budget.py evaluated all nine planned configurations on all three assessment datasets.
+
+    - The resulting matrix contained 9 × 3 = 27 complete development trajectories.
+
+    - Every trajectory still ran for the complete 1,000 epochs. The shorter cutoffs therefore changed only which earlier validation states were compared, not how far the audit trajectories themselves trained.
+
+    - Validation was evaluated after every epoch using the existing graph-mean cross-entropy selection criterion.
+
+    - For each trajectory, the audit retained the best validation-selected state available by epochs 100, 250, 500 and 1,000.
+
+    - A named validation_sort_key function ordered recorded states by validation loss and then epoch so the earliest epoch was retained when two records had exactly equal loss.
+
+    - The audit did not need to clone or restore model states because its purpose was to compare validation trajectories and candidate epoch budgets rather than produce assessment predictions.
+
+- The epoch-budget audit used only development training and validation evidence.
+
+    - Development-test results were not used to choose the epoch budget.
+
+    - No cross-validation outer-test result existed when the 500-epoch decision was made.
+
+    - This preserves the separation between protocol development and later assessment.
+
+- The clean audit rerun completed all 27 trajectories successfully on CUDA.
+
+    - Total elapsed time was 7,928.40 seconds, approximately 2.20 hours.
+
+    - The result was saved as results/development_epoch_budget_audit.json.
+
+    - The run reported source commit 834ca47202de75bd64cd89dd4bec17f36d2ccb70.
+
+    - The reported source hash identifies repository HEAD at execution time. It is not by itself evidence that the working tree contained no uncommitted changes, so source provenance is interpreted together with the repository state rather than overstated.
+
+- The 250-epoch cutoff was materially weaker than the chosen 500-epoch allowance.
+
+    - By epoch 250, 11 of the 27 trajectories had already reached exactly the same minimum validation loss later available by epoch 1,000.
+
+    - The median gap between the best loss available by epoch 250 and the eventual 1,000-epoch minimum was approximately 0.00355.
+
+    - The mean 250-epoch gap was approximately 0.00827.
+
+    - The largest observed 250-epoch gap was approximately 0.06563.
+
+    - These results showed that 250 epochs would provide a substantially cheaper allowance, but the shorter budget more frequently excluded later lower-validation-loss states.
+
+- The 500-epoch cutoff retained more of the validation-loss behaviour observed under the original allowance.
 
     - By epoch 500, 16 of the 27 trajectories had already reached exactly the same minimum validation loss later available by epoch 1,000.
 
-    - Across all 27 trajectories, the median 500-epoch validation-loss gap from the 1,000-epoch minimum was zero, the mean gap was approximately 0.00476 and the largest observed gap was approximately 0.06177.
+    - The median 500-epoch validation-loss gap was exactly zero.
 
-    - MUTAG GIN produced the largest observed 500-epoch gap, so the audit does not establish that every trajectory has converged by epoch 500.
+    - The mean gap was approximately 0.00476.
 
-    - Later decreases in validation cross-entropy did not necessarily correspond to higher validation accuracy because state selection is defined by cross-entropy rather than accuracy.
+    - The largest observed gap was approximately 0.06177.
 
-- Fixed the final training allowance at exactly 500 epochs for every final fit.
+    - The zero median means that at least half of the audited trajectories had no further improvement in their selected validation loss after epoch 500.
 
-    - The 500-epoch value is a common prospective computational budget supported by the development convergence audit.
+    - It does not mean every trajectory had converged by that point.
 
-    - It substantially reduces computation while retaining much of the useful validation-loss convergence observed under the previous allowance.
+- MUTAG GIN produced the largest observed difference between the 500-epoch and 1,000-epoch selections.
 
-    - It is not a claim that every model or dataset reaches its absolute optimum within 500 epochs.
+    - Its best validation state available by epoch 500 occurred at epoch 465 with loss 0.212927.
 
-    - There is no model-specific epoch allowance, patience rule or early stopping.
+    - Its overall 1,000-epoch minimum occurred at epoch 682 with loss 0.151158.
 
-    - Validation continues after every epoch and selects the strict minimum graph-mean validation cross-entropy within the complete 500-epoch allowance.
+    - The resulting gap of approximately 0.06177 demonstrates why the 500-epoch allowance is described as a computationally justified common budget rather than a guarantee that every configuration reaches its eventual minimum within 500 epochs.
 
-    - An exact validation-loss tie retains the earlier epoch.
+- Later decreases in validation cross-entropy did not necessarily correspond to higher validation accuracy.
 
-    - Training continues through epoch 500 regardless of when the selected state occurs, after which the selected state is restored before outer-test assessment.
+    - PROTEINS GIN, for example, had validation accuracy 0.8108 at the best state available by epoch 500, whereas the lower-loss state selected at epoch 540 had validation accuracy 0.7658.
 
-- Fixed final assessment at stratified five-fold outer cross-validation.
+    - This is not a conflict in the selection procedure because checkpoint selection is defined by graph-mean cross-entropy rather than validation accuracy.
 
-    - Fold IDs are 0 through 4 and every graph appears in the outer-test partition exactly once.
+    - The observation reinforces the need to distinguish the declared optimisation-selection quantity from other reported metrics rather than retrospectively preferring whichever epoch has the highest accuracy.
 
-    - Each outer-test fold contains approximately 20 percent of the complete dataset.
+- Fixed 500 epochs as the common assessment training allowance.
 
-    - Approximately 10 percent of the complete dataset is reserved for validation from the remaining approximately 80 percent, leaving approximately 70 percent for fitting.
+    - Every assessment fit trains for all 500 epochs.
 
-    - Reserving approximately one eighth of the outer training remainder for validation gives the intended approximately 70/10/20 fit, validation and outer-test allocation.
+    - There is no model-specific epoch budget.
 
-    - Stage 6.4 will implement and verify the exact deterministic classwise allocation and integer rounding.
+    - There is no patience-based early stopping.
 
-    - Corresponding configurations use identical fold identities so comparisons are made on the same held-out graphs.
+    - Validation is evaluated after every epoch.
 
-    - One predetermined training realisation is used per configuration and fold rather than a seed search or repeated-initialisation grid.
+    - The selected state is the earliest state achieving the strict minimum graph-mean validation cross-entropy within the 500-epoch allowance.
 
-    - Final summaries retain all five fold values and report their arithmetic mean and sample standard deviation with ddof=1.
+    - Training continues after the selected epoch until all 500 epochs are complete, after which the selected state is restored for outer-test assessment.
 
-- Fixed the complete final training matrix at 135 fits.
+    - The 500-epoch allowance therefore separates a fixed computational budget from validation-based state selection.
 
-    - Five reference configurations across three datasets and five folds give 75 fits: GCN, GraphSAGE, GIN, reference GAT and GATv2.
+- Fixed assessment at stratified five-fold outer cross-validation.
 
-    - The additional one-head, two-head and four-head GAT variants required by RQ1 give 45 fits.
+    - Fold IDs are 0 through 4.
 
-    - RQ2 requires no additional fits because it reuses the reference GAT and GATv2 results.
+    - Each graph appears in the outer-test role exactly once across the five folds.
 
-    - Uniform-attention GAT contributes 15 fits for RQ3.
+    - One outer fold is approximately 20 percent of the complete dataset.
 
-    - RQ4 requires no additional optimisation fits because it reuses the 15 selected reference-GAT states.
+    - Approximately one eighth of the remaining approximately 80 percent is reserved for validation.
 
-    - The total is therefore 75 + 45 + 15 = 135 final fits.
+    - This produces an intended whole-dataset allocation of approximately 70 percent fitting, 10 percent validation and 20 percent outer test in each fold.
 
-    - At 500 epochs each, the final matrix contains 67,500 nominal fit-epochs compared with 270,000 under the earlier 270-fit, 1,000-epoch design.
+    - The exact integer allocation was left to Stage 6.4 so that it could be implemented and checked directly rather than describing approximate percentages as exact graph counts.
 
-- Used the completed convergence audit to form a practical runtime estimate for the final matrix.
+- Fixed a deterministic seed schedule with separate roles for partitioning and model fitting.
 
-    - The audit required approximately 2.20 hours for 27 trajectories of 1,000 epochs under the development partitions.
+    - Outer-fold construction uses split seed 0.
 
-    - Scaling that observation to five times as many fits at half as many epochs gives a first-order estimate of approximately 5.5 hours.
+    - Fold-local validation construction uses seed 1000 + fold_id.
 
-    - Final fitting partitions are slightly smaller than the development training partitions, while final assessment, state saving and recording add other overhead.
+    - Model initialisation and fitting-loader randomness use seed 2000 + fold_id.
 
-    - The estimate is therefore used only for planning and is not treated as a promised final wall time.
+    - Corresponding configurations therefore use exactly the same fold identities and partition construction while retaining one predetermined training realisation for each fold.
 
-- Fixed RQ4 as one connected fitted-attention investigation before final assessment.
+    - No seed search or repeated-initialisation grid is introduced.
 
-    - It uses the validation-selected reference eight-head GAT state from every dataset and outer fold, giving 15 fitted states.
+- Fixed the assessment summary to the five held-out fold results.
 
-    - Only the corresponding outer-test graphs are analysed for each state, preserving complete out-of-fold graph coverage.
+    - The individual fold values are retained rather than reporting only an aggregate.
 
-    - Both GAT layers are analysed separately.
+    - The arithmetic mean summarises the five outer-test values.
 
-    - For receiver i and head h with m_i greater than one incoming entries, normalised entropy is H_i,h = -sum_j alpha_i,j,h log(alpha_i,j,h) / log(m_i), and departure from uniformity is D_i,h = 1 - H_i,h.
+    - Sample standard deviation is calculated with ddof=1, corresponding to a denominator of 4 for five folds.
 
-    - Uniform neighbourhood weighting gives D_i,h = 0.
+    - The folds are treated as the five cross-validation assessments rather than incorrectly described as independent datasets, because their fitting partitions overlap.
 
-    - Receivers with only one incoming entry are excluded from the entropy calculation because no weighting choice exists and log(1) is zero. Their counts are retained.
+- Fixed the complete optimisation matrix at 135 fits.
 
-    - First-layer heads are averaged for the primary receiver-level quantity, eligible receivers are averaged within each graph, and graphs are weighted equally within each fold.
+    - GCN, GraphSAGE, GIN, reference GAT and GATv2 across three datasets and five folds give 5 × 3 × 5 = 75 reference fits.
 
-    - The five fold-level values are retained and summarised using their arithmetic mean and sample standard deviation.
+    - The additional one-head, two-head and four-head GAT configurations required for RQ1 contribute 3 × 3 × 5 = 45 fits.
 
-- Fixed the second component of RQ4 as a fitted-model uniform-attention intervention.
+    - The eight-head GAT is reused from the reference matrix rather than fitted again for RQ1.
 
-    - The same selected reference-GAT state and the same outer-test graphs are used before and after intervention.
+    - RQ2 requires no additional optimisation because both GAT and GATv2 are already present in the reference matrix.
 
-    - The intervention sets conv1.att_src, conv1.att_dst, conv2.att_src and conv2.att_dst to zero after loading the fitted state.
+    - Uniform GAT contributes 1 × 3 × 5 = 15 additional fits for RQ3.
 
-    - No retraining occurs.
+    - RQ4 reuses the 15 selected reference-GAT states and therefore adds no optimisation fits.
 
-    - The fitted message transformations, biases, classifier, topology, self connections and head organisation remain unchanged.
+    - The total is 75 + 45 + 15 = 135 fits.
 
-    - Equal attention logits produce uniform softmax coefficients over the effective incoming entries.
+- The 500-epoch and five-fold decisions reduce the nominal optimisation workload substantially compared with the earlier design.
 
-    - The predefined predictive endpoints are change in graph-mean cross-entropy, change in accuracy and prediction-flip rate.
+    - The earlier ten-fold, 1,000-epoch matrix implied 270 fits and 270,000 nominal fit-epochs.
 
-    - Cross-entropy change is intervention loss minus learned-attention loss.
+    - The locked matrix contains 135 fits × 500 epochs = 67,500 nominal fit-epochs.
 
-    - Accuracy change is intervention accuracy minus learned-attention accuracy.
+    - 67,500 is exactly one quarter of 270,000.
 
-    - Prediction-flip rate is the proportion of held-out graphs whose predicted class changes after the intervention.
+    - This reduction preserves all nine scientific configurations while reducing repeated outer folds and the common maximum training allowance rather than deleting model families from the investigation.
 
-    - Original graph identities, labels and predictions are retained so the two conditions remain aligned.
+- Used the clean convergence audit to form a practical runtime estimate.
 
-    - The intervention measures fitted-model sensitivity and does not establish attention coefficients as faithful explanations or real-world causal importance.
+    - Twenty-seven 1,000-epoch development trajectories required approximately 2.20 hours.
 
-- Kept the final methodology focused on controlled comparison rather than model-specific benchmark optimisation.
+    - The assessment contains five times as many fits but half as many epochs per fit.
 
-    - No final learning-rate, width, dropout, epoch or seed grid is introduced.
+    - Direct scaling therefore gives approximately 2.20 × 5 × 0.5 = 5.5 hours as a first-order training estimate under similar machine conditions.
 
-    - Shared settings remain fixed so the attention-design comparisons take place under one declared pipeline.
+    - The estimate is planning evidence rather than a promised wall-clock duration because assessment partition sizes, result recording, state saving and other overhead differ from the development audit.
 
-    - Conclusions will therefore concern behaviour under that matched pipeline rather than globally optimal performance for each model family.
+- Fixed the first component of RQ4 as a graph-weighted measurement of learned attention non-uniformity.
 
-- The final dataset set, research questions, configurations, epoch budget and fold count are now fixed before final assessment.
+    - RQ4 uses the validation-selected eight-head reference GAT from every dataset and outer fold, giving 15 fitted reference states.
 
-    - Stage 6.4 will implement the exact five-fold partition path, seed schedule, final runner and result-recording contract.
+    - Only the corresponding outer-test graphs are analysed for each fitted state.
 
-    - No further dataset, research-question, model, fold-count or epoch-budget selection remains before implementation.
+    - Both GAT layers are examined separately.
 
-- 6.3 fixed the experiment budget and final scope
+    - For receiver i and head h with m_i greater than one incoming entries, normalised entropy is H_i,h = -sum_j alpha_i,j,h log(alpha_i,j,h) / log(m_i).
+
+    - Departure from uniformity is D_i,h = 1 - H_i,h.
+
+    - Perfectly uniform weighting gives D_i,h = 0.
+
+    - Receivers with one incoming entry are excluded from this entropy calculation because log(1) is zero and no weighting choice exists. Their counts are still retained.
+
+    - In the first GAT layer, the per-head departure values are averaged to obtain the primary receiver-level value.
+
+    - Eligible receivers are then averaged within each graph.
+
+    - Graphs are averaged equally within a fold so large graphs do not dominate the dataset-level value simply because they contain more receiver nodes.
+
+    - The resulting five fold-level values are retained and summarised using their arithmetic mean and sample standard deviation.
+
+- Fixed the second component of RQ4 as an intervention on the same fitted reference-GAT states.
+
+    - The same selected model state and same outer-test graphs are evaluated before and after intervention.
+
+    - After loading the selected state, conv1.att_src, conv1.att_dst, conv2.att_src and conv2.att_dst are set to zero.
+
+    - No optimiser is created and no retraining occurs after the intervention.
+
+    - Message transformations, biases, classifier parameters, topology, self-loop handling and head organisation remain unchanged.
+
+    - With equal attention logits and zero attention dropout, neighbourhood softmax assigns equal weight to the effective incoming entries.
+
+    - The intervention therefore removes the learned unequal attention scoring while preserving the remainder of the fitted model.
+
+- Fixed three predictive sensitivity endpoints for the RQ4 intervention.
+
+    - Cross-entropy change is defined as intervention loss minus learned-attention loss.
+
+    - Accuracy change is defined as intervention accuracy minus learned-attention accuracy.
+
+    - Prediction-flip rate is the fraction of outer-test graphs whose predicted class changes after the intervention.
+
+    - Original graph identities, true labels, learned-attention predictions and intervention predictions must remain aligned so that graph-level changes can be inspected directly.
+
+    - The intervention is interpreted as fitted-model sensitivity to removing learned unequal weighting.
+
+    - It is not treated as evidence that attention coefficients are faithful explanations or that individual neighbours have causal importance in the underlying scientific domain.
+
+- Kept the assessment methodology focused on controlled comparison rather than separate benchmark optimisation for every model.
+
+    - Hidden width, optimiser, learning rate, weight decay, batch size and other established shared settings remain fixed.
+
+    - No assessment learning-rate grid, width grid, dropout grid, epoch grid or seed search is introduced.
+
+    - Conclusions are therefore restricted to the behaviour of the compared mechanisms under the declared matched pipeline rather than claiming globally optimal performance for every model family.
+
+- The research questions, datasets, configurations, epoch allowance, fold count, seed roles and RQ4 analysis were fixed before cross-validation assessment results were produced.
+
+    - Stage 6.4 therefore became an implementation and verification stage rather than another opportunity to change the scientific scope after observing held-out results.
+
+- Commit: 6.3 fixed the experiment budget and final scope
+
+
+
+
+
+# 6.4 Implement and Lock Final Cross-Validation
+
+- Preserved the established development data utilities before changing the active data path for cross-validation.
+
+    - The previous src/data.py was copied to archive/src/data.py.
+
+    - The archive mirrors the original repository path rather than introducing a separate archive hierarchy for one stage.
+
+    - The archived file is retained as historical source and is not imported by the active experiment code.
+
+    - The active src/data.py continues to contain the earlier development split logic alongside the new cross-validation functions, so the historical behaviour remains understandable while the current assessment path is explicit.
+
+- Added stratified_folds to construct the outer cross-validation folds.
+
+    - The function first creates one list of original graph indices for each processed class.
+
+    - enumerate(dataset) supplies the stable original dataset index of every graph, while graph.y.item() identifies the processed class used for stratification.
+
+    - np.random.default_rng(seed) creates the local NumPy random generator used for outer-fold shuffling without relying on unrelated global random state.
+
+    - Each class list is converted to a NumPy array and shuffled independently using the same generator.
+
+    - The shuffled indices are distributed cyclically across the requested number of folds.
+
+    - fold_id advances after every graph and is not reset when the next class begins.
+
+    - Carrying the fold position across classes avoids unnecessarily favouring fold 0 whenever a class count is not divisible by five and helps balance complete fold sizes as well as class-specific counts.
+
+    - Every completed fold is sorted before being returned so the stored partition representation follows original dataset-index order rather than shuffled allocation order.
+
+- The outer split is parameterised by num_folds and seed rather than hard-coding five folds and seed 0 inside src/data.py.
+
+    - run_cv.py declares num_folds=5 and split_seed=0 as experiment settings.
+
+    - This keeps the scientific choice visible in the experiment runner while stratified_folds remains a simple reusable partition function.
+
+    - Fold IDs are generated as 0 through 4 from the configured number of folds.
+
+- Added stratified_validation_split to create the fitting and validation partitions inside one outer-fold remainder.
+
+    - The function receives only the indices remaining after the outer-test fold has been removed.
+
+    - It rebuilds class-specific index lists from that remainder so validation allocation remains stratified independently inside each outer fold.
+
+    - This separation prevents outer-test graphs from becoming candidates for validation.
+
+    - A new local NumPy generator is created from the supplied fold-specific validation seed.
+
+- Fixed the exact classwise validation-size rule as int(n / 8 + 0.5).
+
+    - n is the number of graphs from one class remaining after removal of the outer-test fold.
+
+    - Dividing by 8 targets one eighth of the approximately 80 percent outer remainder.
+
+    - One eighth of 80 percent is 10 percent of the complete dataset, producing the intended approximately 70/10/20 fitting, validation and outer-test allocation.
+
+    - Adding 0.5 before int() implements ordinary nearest-integer rounding explicitly rather than depending on Python round() behaviour at exact half values.
+
+    - The result is bounded between 1 and n - 1 so a represented class cannot lose every remaining graph to validation and cannot contribute zero validation graphs.
+
+    - The current datasets contain far more than two outer-remainder examples per class, but an explicit ValueError rejects a class with fewer than two because a valid fit/validation division would then be impossible.
+
+- Fitting and validation indices are sorted after the classwise allocation.
+
+    - Sorting does not change which graphs belong to either partition.
+
+    - It gives the saved partitions one stable original-index representation and makes graph identity easier to inspect later.
+
+    - Training randomness is introduced subsequently by the fitting DataLoader rather than by preserving an arbitrary shuffled order in the saved fitting-index list.
+
+- Added experiments/inspections/inspect_cv_splits.py so the new partition contract could be checked with one clean terminal command.
+
+    - The inspection was run with python -m experiments.inspections.inspect_cv_splits.
+
+    - class_counts iterated over supplied original dataset indices and counted the processed target class of every selected graph.
+
+    - The inspection therefore reported both total partition sizes and class-specific counts rather than checking only that the arithmetic totals looked plausible.
+
+    - set objects were used for the integrity checks because membership and overlap between graph-index collections are the relevant properties.
+
+    - isdisjoint verified that fitting, validation and outer-test partitions contained no common graph index.
+
+    - The pipe operator between sets formed their union so the inspection could verify that the three partitions collectively reproduced the complete set of dataset indices.
+
+- Every inspected MUTAG fold passed the partition checks.
+
+    - Folds 0, 1 and 2 each contained 131 fitting graphs, 19 validation graphs and 38 outer-test graphs.
+
+    - Their fitting class counts were [44, 87], validation class counts were [6, 13] and test class counts were [13, 25].
+
+    - Folds 3 and 4 each contained 132 fitting graphs, 19 validation graphs and 37 outer-test graphs.
+
+    - Their fitting class counts were [45, 87], validation class counts were [6, 13] and test class counts were [12, 25].
+
+    - Every fold reported Disjoint: True and Complete: True.
+
+    - The final Outer test partition: True check established that the five test folds collectively contained all 188 MUTAG graphs exactly once.
+
+- Every inspected PROTEINS fold also passed the partition checks.
+
+    - Folds 0, 1 and 2 each contained 779 fitting graphs, 111 validation graphs and 223 outer-test graphs.
+
+    - Their fitting class counts were [464, 315], validation class counts were [66, 45] and test class counts were [133, 90].
+
+    - Folds 3 and 4 each contained 780 fitting graphs, 111 validation graphs and 222 outer-test graphs.
+
+    - Their fitting class counts were [465, 315], validation class counts were [66, 45] and test class counts were [132, 90].
+
+    - Every fold reported Disjoint: True and Complete: True.
+
+    - Outer test partition: True established that the five test folds collectively contained all 1,113 PROTEINS graphs exactly once.
+
+- Every inspected NCI1 fold passed the same checks.
+
+    - Every fold contained exactly 2,877 fitting graphs, 411 validation graphs and 822 outer-test graphs.
+
+    - Folds 0, 1 and 2 had fitting class counts [1437, 1440], validation class counts [205, 206] and test class counts [411, 411].
+
+    - Folds 3 and 4 had fitting class counts [1438, 1439], validation class counts [205, 206] and test class counts [410, 412].
+
+    - The slight class-count difference in folds 3 and 4 follows from distributing class totals that are not both divisible exactly by five.
+
+    - Every fold reported Disjoint: True and Complete: True.
+
+    - Outer test partition: True established that all 4,110 NCI1 graphs occur exactly once in the outer-test role.
+
+- The realised fold sizes confirmed the intended approximate whole-dataset allocation without requiring equal integer counts in every fold.
+
+    - MUTAG uses 131 or 132 fitting graphs, 19 validation graphs and 37 or 38 test graphs.
+
+    - PROTEINS uses 779 or 780 fitting graphs, 111 validation graphs and 222 or 223 test graphs.
+
+    - NCI1 uses 2,877 fitting graphs, 411 validation graphs and 822 test graphs in every fold.
+
+    - These exact sizes are consequences of class-stratified integer allocation rather than percentages being rounded only after the complete dataset is split.
+
+- Reorganised inspection utilities under experiments/inspections so diagnostic scripts remain separate from experiment runners.
+
+    - Dataset inspectors now live under experiments/inspections/datasets.
+
+    - Model inspectors now live under experiments/inspections/models.
+
+    - General methodological inspections such as inspect_cv_splits.py and inspect_epoch_budget.py live directly under experiments/inspections.
+
+    - The active experiments directory is therefore reserved for experiment-level runners and orchestration rather than accumulating unrelated inspection scripts.
+
+    - The reorganised CV inspection was rerun successfully through its new module path and reproduced the same partition output.
+
+- Extended src/evaluation.py with evaluate_with_predictions while retaining the existing evaluate behaviour.
+
+    - model.eval() switches the model to evaluation mode before held-out inference.
+
+    - torch.no_grad() prevents gradient construction because evaluation does not perform optimisation.
+
+    - Each graph batch is moved to the selected device before the model receives x, edge_index and batch.
+
+    - F.cross_entropy calculates the same per-batch classification loss used by the existing evaluation path.
+
+    - Multiplying loss.item() by graph_batch.num_graphs before accumulation ensures the final division by total_graphs gives graph-mean cross-entropy rather than an unweighted average of differently sized minibatch means.
+
+    - logits.argmax(dim=1) converts class logits into one predicted class ID per graph.
+
+    - Accuracy is accumulated as the number of correct graph predictions divided by the total number of graphs.
+
+- evaluate_with_predictions additionally preserves graph-level prediction evidence.
+
+    - predictions.cpu().tolist() moves predicted class IDs to CPU and converts them into ordinary Python values suitable for JSON recording.
+
+    - graph_batch.y.cpu().tolist() does the same for the true labels.
+
+    - Predictions and labels are appended in loader order.
+
+    - Outer-test DataLoaders use shuffle=False, while test_indices are stored in sorted original-index order.
+
+    - The saved test_indices, predictions and labels are therefore aligned position by position.
+
+    - This graph-level alignment is required later for the RQ4 intervention, where predictions from the fitted reference GAT and its uniform-attention intervention must be compared on exactly the same held-out graphs.
+
+- Extended src/recording.py so result filenames can include explicit fold identity.
+
+    - get_result_path already constructs paths from result type, model, dataset, optional variant and training seed.
+
+    - When fold_id is present in the supplied settings, the function now inserts _fold followed by the fold number before the seed component.
+
+    - A standard reference GAT fold can therefore use a path such as results/cross_validation_gat_mutag_fold0_seed2000.json.
+
+    - A one-head variant can use results/cross_validation_gat_mutag_heads1_fold0_seed2000.json.
+
+    - Historical development settings do not contain fold_id, so their established filenames remain unchanged.
+
+- The existing model-state recording path remains separate from the JSON evidence record.
+
+    - save_model_state stores model.state_dict(), containing the learned model tensors rather than serialising the complete Python model object.
+
+    - The state can later be restored into the same architecture with load_state_dict.
+
+    - This is important for RQ4 because the exact validation-selected reference-GAT state from each fold must later be loaded for attention analysis and intervention without retraining.
+
+    - The binary file is opened with mode xb, so an existing state file is not silently overwritten.
+
+- Added experiments/run_cv.py as the active cross-validation experiment runner.
+
+    - The runner directly owns the current assessment settings rather than importing them from the historical single-split development runner.
+
+    - Shared settings are hidden_dim 64, learning rate 0.01, weight decay 0.0005, 500 epochs, batch size 32, split seed 0 and five folds.
+
+    - dataset and training seed are not stored as meaningless common defaults because they are assigned by the dataset and fold loops respectively.
+
+    - model_settings contains only configuration-specific additions for the five reference models.
+
+    - GCN, GraphSAGE and GIN require no additional settings beyond their model identity.
+
+    - Reference GAT uses 8 heads.
+
+    - GATv2 uses 8 heads with share_weights=False.
+
+- run_cv.py declares MUTAG, PROTEINS and NCI1 as the three assessment datasets and GCN, GraphSAGE, GIN, GAT and GATv2 as the five reference models.
+
+    - The Cartesian combination of those lists produces the 15 dataset/model combinations required for Stage 6.5.
+
+    - Each combination is then evaluated across fold IDs 0 through 4, producing the planned 75 reference fits.
+
+    - The runner therefore expresses the complete reference matrix directly without manually listing 75 separate jobs.
+
+- run_cross_validation receives one complete model/dataset settings dictionary and the fold IDs to execute.
+
+    - load_dataset loads the selected dataset once for that model/dataset combination.
+
+    - stratified_folds reconstructs the deterministic outer folds from num_folds and split_seed.
+
+    - fold-specific settings are copied from the supplied settings so one fold cannot mutate the settings used by another.
+
+    - fold_id records explicit outer-fold identity.
+
+    - validation_split_seed is assigned as 1000 + fold_id.
+
+    - training seed is assigned as 2000 + fold_id.
+
+- The runner derives every fold's output paths before beginning training.
+
+    - get_result_path constructs the fold-specific JSON path.
+
+    - Replacing the .json suffix with .pt gives the paired model-state path.
+
+    - prepare_result_path checks both paths before the fold is added to the list of executable runs.
+
+    - All requested fold paths are therefore checked before optimisation begins.
+
+    - If one requested result or state already exists, execution fails before spending time fitting earlier folds and then discovering the conflict later.
+
+    - This preserves the established project rule that recorded evidence is never silently overwritten.
+
+- The source commit and compute device are recorded once before executing the prepared folds.
+
+    - get_source_commit calls git rev-parse HEAD so every saved result identifies the repository commit visible to Git at execution time.
+
+    - torch.cuda.is_available() selects CUDA when available and otherwise falls back to CPU.
+
+    - The selected device type is printed before fitting begins.
+
+    - CUDA device name is also retained in the saved result when CUDA is used.
+
+- Each outer fold is reconstructed explicitly from original dataset indices.
+
+    - outer_folds[fold_id] supplies the current test indices.
+
+    - A set of those indices supports efficient membership checking while constructing the outer remainder.
+
+    - remainder_indices contains every dataset index that is not part of the current outer-test fold.
+
+    - stratified_validation_split then divides only that remainder into fitting and validation indices using the fold-specific validation seed.
+
+- Model-training randomness is fixed separately from partition randomness.
+
+    - set_seed(2000 + fold_id) seeds Python random, NumPy and PyTorch before model construction.
+
+    - A separate torch.Generator is created and manually seeded with the same training seed for the fitting DataLoader.
+
+    - The fitting loader uses shuffle=True, so training minibatch order changes deterministically according to the assigned fold seed.
+
+    - Validation and outer-test loaders use shuffle=False because their purpose is deterministic assessment rather than stochastic optimisation.
+
+    - Corresponding configurations use the same training seed for a given fold, preserving one predetermined training realisation rather than searching for favourable seeds.
+
+- Model construction and optimisation reuse the existing shared lower-level implementation.
+
+    - build_model receives the fold settings, dataset input width and number of classes.
+
+    - The selected model is moved to the chosen device before optimisation.
+
+    - Adam receives only parameters whose requires_grad flag is True.
+
+    - This matters for Uniform GAT because its attention-scoring parameters are deliberately frozen while the remaining trainable transformations and classifier are still optimised.
+
+    - Learning rate and weight decay come directly from the shared assessment settings.
+
+- Every fold uses the existing train_model selection path for all 500 epochs.
+
+    - train_model performs one training pass per epoch and evaluates validation after every epoch.
+
+    - The selected state changes only when validation loss is strictly lower than the previous minimum.
+
+    - An exact tie therefore leaves the earlier selected state unchanged.
+
+    - The selected state tensors are preserved during training.
+
+    - Optimisation still continues for the complete 500 epochs.
+
+    - At the end of training, the selected state is restored into the model before run_cross_validation receives control again.
+
+    - The subsequent outer-test evaluation therefore uses the validation-selected state rather than the epoch-500 state automatically.
+
+- Outer-test assessment is performed only after the validation-selected state has been restored.
+
+    - evaluate_with_predictions returns graph-mean cross-entropy, accuracy, graph-level predicted classes and graph-level true labels.
+
+    - No outer-test information is supplied to train_model or used for state selection.
+
+    - The outer-test partition therefore remains an assessment partition rather than becoming part of optimisation or checkpoint choice.
+
+- Each fold records total and trainable parameter counts.
+
+    - total_parameters sums numel() over every model parameter.
+
+    - trainable_parameters sums only parameters with requires_grad=True.
+
+    - For ordinary models these values are expected to be equal.
+
+    - For Uniform GAT the distinction records the frozen attention-scoring parameters explicitly rather than treating the constrained model as if every stored parameter were trainable.
+
+- The runtime calculation preserves the established training-pass convention.
+
+    - training_seconds is returned by train_model.
+
+    - mean_seconds_per_epoch divides that value by the fixed 500 completed epochs.
+
+    - The saved convention states that the timing covers training-loader iteration, device transfer, forward pass, loss, backward pass, optimiser update and training metric calculation and accumulation.
+
+    - Validation, outer-test assessment, selected-state copying and restoration, progress printing, model-state saving and result writing remain outside that timing quantity.
+
+- Each cross-validation JSON records the information required to reproduce and audit one fold.
+
+    - settings contains the model configuration together with dataset, fold ID, validation split seed and training seed.
+
+    - dataset records the settled TUDataset loading policy.
+
+    - feature_policy states explicitly that categorical node labels/features and connectivity are used while continuous node attributes and edge features are excluded.
+
+    - partitions records the outer split seed, validation split seed and complete original-index lists for fitting, validation and outer test.
+
+    - selection records the declared criterion, tie rule, absence of early stopping, selected epoch, completed epoch count, selected validation loss and selected validation accuracy.
+
+    - outer_test records the held-out loss, accuracy, predictions and labels.
+
+    - parameters, runtime, device, source_commit and model_state_path preserve the remaining execution provenance.
+
+- Each fold saves the selected model state before writing its JSON record.
+
+    - The .pt file contains the state restored by train_model, so it corresponds to the validation-selected epoch rather than simply the last optimisation epoch.
+
+    - The paired JSON points to that state path.
+
+    - The reference GAT .pt files are therefore directly reusable for the later RQ4 fitted-attention analysis without refitting the model.
+
+- The runner prints the most important evidence after every fold.
+
+    - Fold identity, fitting size, validation size, test size, training seed and validation split seed are printed before training.
+
+    - Selected epoch, validation loss and validation accuracy are printed after fitting.
+
+    - Outer-test loss and accuracy are printed separately so selection evidence is not confused with held-out assessment evidence.
+
+    - Parameter counts, training time, mean seconds per epoch and both saved paths are also printed.
+
+- Updated experiments/ablation.py so later attention variants reuse run_cross_validation instead of maintaining their own training framework.
+
+    - The variant list contains GAT heads 1, 2, 4 and the eight-head reference configuration, the reference GATv2 configuration and Uniform GAT.
+
+    - get_variant_settings begins from the shared run_cv settings, applies the standard settings for the selected model and then applies only the settings specific to that variant.
+
+    - This ordering gives variant-specific settings the final say without duplicating the complete common configuration in every variant dictionary.
+
+- The head-count configurations preserve total first-layer representation width at 64.
+
+    - One head uses 64 channels per head.
+
+    - Two heads use 32 channels per head.
+
+    - Four heads use 16 channels per head.
+
+    - Eight heads use 8 channels per head.
+
+    - Multiplying channels per head by head count gives 64 in every case.
+
+    - The ablation inspection printed these derived values directly so the width-control condition was checked before any RQ1 fitting begins.
+
+- The ablation runner distinguishes configurations requiring new optimisation from configurations already present in the reference matrix.
+
+    - GAT heads 1, 2 and 4 are marked as additional cross-validation fits.
+
+    - The eight-head reference GAT is marked as reusing its existing cross-validation results.
+
+    - GATv2 is also marked as reusing its existing cross-validation results.
+
+    - Uniform GAT is marked as an additional cross-validation fit.
+
+    - run_variant rejects a configuration marked for reference reuse rather than accidentally retraining it under a second path.
+
+- The ablation inspection also checked fold-aware result naming without starting training.
+
+    - The command python -m experiments.ablation printed the effective settings for each configuration.
+
+    - All configurations reported 500 epochs, batch size 32, split seed 0 and five folds.
+
+    - Example paths used MUTAG fold 0 and training seed 2000.
+
+    - The one-head example path was results/cross_validation_gat_mutag_heads1_fold0_seed2000.json.
+
+    - The two-head example path was results/cross_validation_gat_mutag_heads2_fold0_seed2000.json.
+
+    - The four-head example path was results/cross_validation_gat_mutag_heads4_fold0_seed2000.json.
+
+    - The reference-GAT example path was results/cross_validation_gat_mutag_fold0_seed2000.json.
+
+    - The GATv2 example path was results/cross_validation_gatv2_mutag_fold0_seed2000.json.
+
+    - The Uniform GAT example path was results/cross_validation_gat_mutag_uniform_fold0_seed2000.json.
+
+- Removed the active cross-validation code's dependency on the historical development runner.
+
+    - An initial version of run_cv.py reused settings from experiments/train.py, which caused historical development defaults to leak into current inspection output even though the actual dataset loop would later overwrite them.
+
+    - The current run_cv.py instead owns the active assessment settings and model settings directly.
+
+    - ablation.py imports those current definitions from run_cv.py.
+
+    - This gives the active assessment code one clear source for the current protocol and avoids depending on a runner whose purpose was the earlier single-split development phase.
+
+- Confirmed that no active Python file still imports experiments.train.
+
+    - Get-ChildItem experiments -Recurse -Filter *.py | Select-String "experiments.train" produced no matches after the dependency was removed.
+
+    - experiments/train.py was then moved to archive/experiments/train.py.
+
+    - The earlier ablation implementation had already been retained under archive/experiments/ablation.py.
+
+    - The archive therefore preserves the superseded development implementations while the active experiments package contains the current cross-validation path.
+
+- Verified the active modules after archiving the development runner.
+
+    - python -c "import experiments.run_cv; import experiments.ablation; print('imports passed')" printed imports passed.
+
+    - python -m experiments.ablation then executed successfully from the reorganised active code.
+
+    - The inspection did not start optimisation and confirmed that the active configuration no longer inherits the retired development runner.
+
+- Stage 6.4 therefore fixed both the data-partition contract and the execution contract before any reference cross-validation results were generated.
+
+    - Outer folds, validation construction, seed roles, epoch allowance, checkpoint selection, test evaluation, graph-level prediction recording, state saving and result naming now follow one shared implementation.
+
+    - Stage 6.5 can execute the 75 reference fits without making further methodological choices about how the cross-validation procedure works.
+
+- Commit: 6.4 implemented and locked the cross-validation protocol

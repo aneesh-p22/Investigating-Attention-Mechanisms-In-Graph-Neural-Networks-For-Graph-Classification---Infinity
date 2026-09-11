@@ -23,9 +23,6 @@ def get_result_path(settings, result_type):
     if settings.get("variant"):
         result_path += f"_{settings['variant'].lower()}"
 
-    if settings.get("fold_id") is not None:
-        result_path += f"_fold{settings['fold_id']}"
-
     result_path += f"_seed{settings['seed']}.json"
 
     return result_path
