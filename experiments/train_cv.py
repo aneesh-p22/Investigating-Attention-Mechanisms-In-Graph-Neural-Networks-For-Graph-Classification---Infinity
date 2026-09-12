@@ -178,11 +178,12 @@ def run_cross_validation(current_settings, fold_ids):
         print("Fit graphs:", len(fit_indices))
         print("Validation graphs:", len(val_indices))
         print("Outer test graphs:", len(test_indices))
-        print("Training seed:", fold_settings["seed"])
-        print(
-            "Validation split seed:",
-            fold_settings["validation_split_seed"],
-        )
+
+        print()
+        print("Settings:")
+
+        for name, value in fold_settings.items():
+            print(f"{name}: {value}")
 
         print()
         print("Training:")
