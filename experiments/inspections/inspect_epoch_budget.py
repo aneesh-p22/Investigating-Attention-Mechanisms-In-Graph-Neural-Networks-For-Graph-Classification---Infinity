@@ -192,7 +192,7 @@ def run_configuration(
             device,
         )
 
-        val_loss, val_accuracy = evaluate(
+        val_loss, val_accuracy, _, _ = evaluate(
             model,
             val_loader,
             device,

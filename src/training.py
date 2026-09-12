@@ -1,3 +1,4 @@
+import math
 import time
 
 import torch
@@ -79,11 +80,17 @@ def train_model(
 
         training_seconds += time.perf_counter() - start_time
 
-        val_loss, val_accuracy = evaluate(
+        if not math.isfinite(train_loss):
+            raise ValueError(f"Non-finite training loss at epoch {epoch}")
+
+        val_loss, val_accuracy, _, _ = evaluate(
             model,
             val_loader,
             device,
         )
+
+        if not math.isfinite(val_loss):
+            raise ValueError(f"Non-finite validation loss at epoch {epoch}")
 
         if val_loss < best_val_loss:
             best_epoch = epoch

@@ -350,7 +350,19 @@
 
     - No cross-validation outer-test result existed when the 500-epoch decision was made.
 
-    - This preserves the separation between protocol development and later assessment.
+    - The budget was fixed before CV outcomes, but development validation used the same benchmark datasets later partitioned for CV.
+
+    - The report therefore describes the budget as informed by development validation on reused benchmark data. Fresh CV fits and disjoint partitions within each fold do not make the earlier global budget decision independent of those data.
+
+    - This information use is recorded in the methodology and its assessment-independence limitation, without changing the accepted 500-epoch budget.
+
+- An earlier audit run experienced machine interruptions.
+
+    - That run reported a mean 500-epoch validation-loss gap of approximately 0.00447 and a maximum gap of approximately 0.05185.
+
+    - Its interruption-affected elapsed time was unsuitable for runtime planning.
+
+    - The clean rerun below provides the values used for the recorded budget analysis and elapsed-time projection; the two runs are kept distinct.
 
 - The clean audit rerun completed all 27 trajectories successfully on CUDA.
 
@@ -488,9 +500,13 @@
 
     - The assessment contains five times as many fits but half as many epochs per fit.
 
-    - Direct scaling therefore gives approximately 2.20 × 5 × 0.5 = 5.5 hours as a first-order training estimate under similar machine conditions.
+    - Direct scaling therefore gives approximately 2.20 × 5 × 0.5 = 5.5 hours as an approximate elapsed-time estimate under similar machine conditions.
 
-    - The estimate is planning evidence rather than a promised wall-clock duration because assessment partition sizes, result recording, state saving and other overhead differ from the development audit.
+    - The estimate is planning evidence rather than a promised duration because assessment partition sizes, validation, result recording, selected-state handling and machine conditions differ from the development audit.
+
+    - The audit total measures elapsed time and is distinct from training_seconds in ordinary fit records, which measures only the timed training passes. The 5.5-hour projection is therefore not a training-pass-only measurement.
+
+    - RQ4 inference and analysis add time beyond this projection of the optimisation matrix.
 
 - Fixed the first component of RQ4 as a graph-weighted measurement of learned attention non-uniformity.
 
@@ -594,7 +610,7 @@
 
 - The outer split is parameterised by num_folds and seed rather than hard-coding five folds and seed 0 inside src/data.py.
 
-    - run_cv.py declares num_folds=5 and split_seed=0 as experiment settings.
+    - train_cv.py declares num_folds=5 and split_seed=0 as experiment settings.
 
     - This keeps the scientific choice visible in the experiment runner while stratified_folds remains a simple reusable partition function.
 
@@ -710,7 +726,13 @@
 
     - The reorganised CV inspection was rerun successfully through its new module path and reproduced the same partition output.
 
-- Extended src/evaluation.py with evaluate_with_predictions while retaining the existing evaluate behaviour.
+- Stage 6.4 initially extended src/evaluation.py with evaluate_with_predictions alongside the original two-value evaluate. The pre-run correction consolidated the active file around one evaluate function.
+
+    - The original two-value implementation had already been preserved in archive/src/evaluation.py before the prediction-preserving addition. That archived original remains unchanged.
+
+    - The active evaluate now performs the same calculation and returns the same four values as the former evaluate_with_predictions, removing the duplicate metric loop.
+
+    - train_model and inspect_epoch_budget.py unpack all four values and use the loss and accuracy; the CV runner also uses the returned prediction and label lists.
 
     - model.eval() switches the model to evaluation mode before held-out inference.
 
@@ -726,7 +748,7 @@
 
     - Accuracy is accumulated as the number of correct graph predictions divided by the total number of graphs.
 
-- evaluate_with_predictions additionally preserves graph-level prediction evidence.
+- The active evaluate preserves graph-level prediction evidence as well as the two metrics.
 
     - predictions.cpu().tolist() moves predicted class IDs to CPU and converts them into ordinary Python values suitable for JSON recording.
 
@@ -762,7 +784,11 @@
 
     - The binary file is opened with mode xb, so an existing state file is not silently overwritten.
 
-- Added experiments/run_cv.py as the active cross-validation experiment runner.
+- Added the cross-validation experiment runner as experiments/run_cv.py and renamed it to experiments/train_cv.py during the pre-run corrections.
+
+    - train_cv.py is a descriptive counterpart to the retired single-split train.py and identifies the cross-validation training procedure.
+
+    - The active run_cv.py path was removed by the rename, and ablation.py now imports experiments.train_cv.
 
     - The runner directly owns the current assessment settings rather than importing them from the historical single-split development runner.
 
@@ -778,7 +804,7 @@
 
     - GATv2 uses 8 heads with share_weights=False.
 
-- run_cv.py declares MUTAG, PROTEINS and NCI1 as the three assessment datasets and GCN, GraphSAGE, GIN, GAT and GATv2 as the five reference models.
+- train_cv.py declares MUTAG, PROTEINS and NCI1 as the three assessment datasets and GCN, GraphSAGE, GIN, GAT and GATv2 as the five reference models.
 
     - The Cartesian combination of those lists produces the 15 dataset/model combinations required for Stage 6.5.
 
@@ -824,6 +850,16 @@
 
     - CUDA device name is also retained in the saved result when CUDA is used.
 
+- Retained scientific qualifiers while simplifying temporary implementation names.
+
+    - outer_folds names the assessment-fold collection in src/data.py, train_cv.py and inspect_cv_splits.py. The runner and split inspector print Outer fold.
+
+    - An outer assessment fold remains an outer fold when its inner selection uses a single validation holdout rather than inner cross-validation.
+
+    - Names such as outer_split_seed, validation_split_seed, selected_epoch and reuse_reference retain their distinct meanings. Existing fold_id, fold_ids, num_folds and stratified_folds remain clear in context.
+
+    - The cleanup removes unnecessary project-timeline labels such as final_settings without removing scientific distinctions.
+
 - Each outer fold is reconstructed explicitly from original dataset indices.
 
     - outer_folds[fold_id] supplies the current test indices.
@@ -858,7 +894,7 @@
 
     - Learning rate and weight decay come directly from the shared assessment settings.
 
-- Every fold uses the existing train_model selection path for all 500 epochs.
+- Every valid fold uses the shared train_model selection path for all 500 epochs.
 
     - train_model performs one training pass per epoch and evaluates validation after every epoch.
 
@@ -874,9 +910,23 @@
 
     - The subsequent outer-test evaluation therefore uses the validation-selected state rather than the epoch-500 state automatically.
 
+- Corrected numerical-failure handling in train_model before CV execution.
+
+    - math.isfinite checks the returned training and validation losses before checkpoint selection. It returns False for NaN and positive or negative infinity.
+
+    - A non-finite loss now raises a ValueError identifying whether training or validation failed and at which epoch.
+
+    - Previously, a NaN validation loss could fail the strict improvement comparison while an earlier finite checkpoint remained available. Training could then restore that earlier state and record selected metrics without preserving the invalid intervening epochs in the JSON.
+
+    - The guard stops such an invalid run for investigation. Valid runs still complete all 500 epochs, use strict validation-loss improvement and retain the earliest exact tie.
+
+    - No automatic retry, shorter successful run or omission from the five-fold result group is introduced.
+
 - Outer-test assessment is performed only after the validation-selected state has been restored.
 
-    - evaluate_with_predictions returns graph-mean cross-entropy, accuracy, graph-level predicted classes and graph-level true labels.
+    - evaluate returns graph-mean cross-entropy, accuracy, graph-level predicted classes and graph-level true labels, in that order.
+
+    - The runner checks test_loss with math.isfinite and raises a ValueError identifying the outer fold if the loss is NaN or infinite. This occurs before either the state or JSON is saved.
 
     - No outer-test information is supplied to train_model or used for state selection.
 
@@ -940,7 +990,7 @@
 
     - The variant list contains GAT heads 1, 2, 4 and the eight-head reference configuration, the reference GATv2 configuration and Uniform GAT.
 
-    - get_variant_settings begins from the shared run_cv settings, applies the standard settings for the selected model and then applies only the settings specific to that variant.
+    - get_variant_settings begins from the shared train_cv settings, applies the standard settings for the selected model and then applies only the settings specific to that variant.
 
     - This ordering gives variant-specific settings the final say without duplicating the complete common configuration in every variant dictionary.
 
@@ -994,9 +1044,9 @@
 
     - An initial version of run_cv.py reused settings from experiments/train.py, which caused historical development defaults to leak into current inspection output even though the actual dataset loop would later overwrite them.
 
-    - The current run_cv.py instead owns the active assessment settings and model settings directly.
+    - The current train_cv.py instead owns the active assessment settings and model settings directly.
 
-    - ablation.py imports those current definitions from run_cv.py.
+    - ablation.py imports those current definitions from train_cv.py.
 
     - This gives the active assessment code one clear source for the current protocol and avoids depending on a runner whose purpose was the earlier single-split development phase.
 
@@ -1010,13 +1060,37 @@
 
     - The archive therefore preserves the superseded development implementations while the active experiments package contains the current cross-validation path.
 
-- Verified the active modules after archiving the development runner.
+    - archive/src/data.py, archive/src/evaluation.py and archive/src/recording.py preserve the corresponding original implementations from before the CV additions.
+
+    - The archive mirrors the source directories directly. Active code does not import it, and the archived files are historical source snapshots rather than a separately maintained runnable package.
+
+- Verified the active modules after archiving the development runner, before the later rename to train_cv.py.
 
     - python -c "import experiments.run_cv; import experiments.ablation; print('imports passed')" printed imports passed.
 
     - python -m experiments.ablation then executed successfully from the reorganised active code.
 
     - The inspection did not start optimisation and confirmed that the active configuration no longer inherits the retired development runner.
+
+- Updated README.md to describe the implemented Stage 6.4 code, the train_cv.py entry point, inspection locations, archive and outstanding reference fits.
+
+    - The external roadmap and system prompt now agree on the active configuration owner, four-value evaluator, numerical-failure guards, clean audit values, interrupted-run history and elapsed-time wording.
+
+    - The governing log convention now explicitly retains the Commit: prefix requested in the handoff. A suggested summary is not evidence that Git has been run.
+
+- Checked the pre-run corrections without executing cross-validation fits.
+
+    - All 33 Python files parsed successfully, and the active imports and evaluator callers matched the renamed runner and four-value interface.
+
+    - A source comparison confirmed that the consolidated evaluate retained the complete calculation of evaluate_with_predictions and that the data-partition logic changed only its fold variable names and requested ValueError formatting.
+
+    - Controlled training checks used stand-ins for numerical operations. A finite four-epoch trajectory with equal minimum losses at epochs 2 and 3 completed all four epochs and restored the epoch-2 parameter and persistent buffer.
+
+    - NaN, positive infinity and negative infinity in either training or validation loss each raised the expected epoch-specific error. Equivalent outer-test checks rejected all three before either output was saved.
+
+    - These checks exercised control flow, not neural-network computation. PyTorch and PyG were unavailable in the audit environment, so no new model fit or real-library execution is claimed.
+
+    - The existing model definitions, archive and saved results were unchanged. No source commit was made in the extracted snapshot.
 
 - Stage 6.4 therefore fixed both the data-partition contract and the execution contract before any reference cross-validation results were generated.
 

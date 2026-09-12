@@ -1,3 +1,5 @@
+import math
+
 import torch
 from torch.optim import Adam
 from torch_geometric.loader import DataLoader
@@ -8,7 +10,7 @@ from src.data import (
     stratified_folds,
     stratified_validation_split,
 )
-from src.evaluation import evaluate_with_predictions
+from src.evaluation import evaluate
 from src.models.factory import build_model
 from src.recording import (
     get_result_path,
@@ -66,7 +68,7 @@ result_type = "cross_validation"
 def run_cross_validation(current_settings, fold_ids):
     dataset = load_dataset(current_settings["dataset"])
 
-    folds = stratified_folds(
+    outer_folds = stratified_folds(
         dataset,
         current_settings["num_folds"],
         current_settings["split_seed"],
@@ -116,7 +118,7 @@ def run_cross_validation(current_settings, fold_ids):
         state_path = fold_run["state_path"]
 
         fold_id = fold_settings["fold_id"]
-        test_indices = folds[fold_id]
+        test_indices = outer_folds[fold_id]
         test_set = set(test_indices)
 
         remainder_indices = [
@@ -172,7 +174,7 @@ def run_cross_validation(current_settings, fold_ids):
         )
 
         print()
-        print("Fold:", fold_id)
+        print("Outer fold:", fold_id)
         print("Fit graphs:", len(fit_indices))
         print("Validation graphs:", len(val_indices))
         print("Outer test graphs:", len(test_indices))
@@ -204,11 +206,14 @@ def run_cross_validation(current_settings, fold_ids):
             test_accuracy,
             test_predictions,
             test_labels,
-        ) = evaluate_with_predictions(
+        ) = evaluate(
             model,
             test_loader,
             device,
         )
+
+        if not math.isfinite(test_loss):
+            raise ValueError(f"Non-finite outer-test loss in outer fold {fold_id}")
 
         total_parameters = sum(
             parameter.numel()

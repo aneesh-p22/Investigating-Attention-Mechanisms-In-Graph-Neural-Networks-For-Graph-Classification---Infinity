@@ -1,4 +1,4 @@
-from experiments.run_cv import (
+from experiments.train_cv import (
     datasets,
     fold_ids,
     model_settings,

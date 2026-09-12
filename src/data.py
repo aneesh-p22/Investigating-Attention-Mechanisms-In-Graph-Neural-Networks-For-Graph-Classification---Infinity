@@ -61,7 +61,7 @@ def stratified_folds(dataset, num_folds, seed):
 
     rng = np.random.default_rng(seed)
 
-    folds = [
+    outer_folds = [
         [] for _ in range(num_folds)
     ]
 
@@ -72,13 +72,13 @@ def stratified_folds(dataset, num_folds, seed):
         rng.shuffle(shuffled_indices)
 
         for index in shuffled_indices:
-            folds[fold_id].append(int(index))
+            outer_folds[fold_id].append(int(index))
             fold_id = (fold_id + 1) % num_folds
 
-    for fold in folds:
-        fold.sort()
+    for outer_fold in outer_folds:
+        outer_fold.sort()
 
-    return folds
+    return outer_folds
 
 
 def stratified_validation_split(
@@ -101,9 +101,7 @@ def stratified_validation_split(
 
     for indices in class_indices:
         if len(indices) < 2:
-            raise ValueError(
-                "Each class must contain at least two outer-remainder graphs"
-            )
+            raise ValueError("Each class must contain at least two outer-remainder graphs")
 
         shuffled_indices = np.array(indices)
         rng.shuffle(shuffled_indices)
