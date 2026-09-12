@@ -8,8 +8,6 @@ def evaluate(model, loader, device):
     total_loss = 0.0
     total_correct = 0
     total_graphs = 0
-    all_predictions = []
-    all_labels = []
 
     with torch.no_grad():
         for graph_batch in loader:
@@ -35,15 +33,7 @@ def evaluate(model, loader, device):
             ).sum().item()
             total_graphs += num_graphs
 
-            all_predictions += predictions.cpu().tolist()
-            all_labels += graph_batch.y.cpu().tolist()
-
     mean_loss = total_loss / total_graphs
     accuracy = total_correct / total_graphs
 
-    return (
-        mean_loss,
-        accuracy,
-        all_predictions,
-        all_labels,
-    )
+    return mean_loss, accuracy

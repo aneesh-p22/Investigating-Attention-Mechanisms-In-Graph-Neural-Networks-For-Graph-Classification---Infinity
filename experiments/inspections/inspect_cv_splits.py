@@ -1,7 +1,7 @@
 from src.data import (
-    load_dataset, 
-    stratified_folds, 
-    stratified_validation_split
+    load_dataset,
+    stratified_folds,
+    stratified_validation_split,
 )
 
 
@@ -26,7 +26,7 @@ def main():
 
     for dataset_name in dataset_names:
         dataset = load_dataset(dataset_name)
-        folds = stratified_folds(dataset, 5, 0)
+        outer_folds = stratified_folds(dataset, 5, 0)
 
         all_indices = set(range(len(dataset)))
         all_test_indices = []
@@ -35,7 +35,7 @@ def main():
         print("Dataset:", dataset_name)
         print("Graphs:", len(dataset))
 
-        for fold_id, test_indices in enumerate(folds):
+        for fold_id, test_indices in enumerate(outer_folds):
             test_set = set(test_indices)
 
             remainder_indices = [
@@ -67,7 +67,7 @@ def main():
             all_test_indices += test_indices
 
             print()
-            print("Fold:", fold_id)
+            print("Outer fold:", fold_id)
             print(
                 "Fit:",
                 len(fit_indices),
