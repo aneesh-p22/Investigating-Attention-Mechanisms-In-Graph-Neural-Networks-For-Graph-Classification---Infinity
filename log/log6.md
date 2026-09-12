@@ -1099,3 +1099,35 @@
     - Stage 6.5 can execute the 75 reference fits without making further methodological choices about how the cross-validation procedure works.
 
 - Commit: 6.4 implemented and locked the cross-validation protocol
+
+
+
+
+
+# 6.5 Final Reference Runs
+
+- Ran python -m experiments.train_cv for the complete reference matrix.
+
+    - Evaluated GCN, GraphSAGE, GIN, GAT and GATv2 on MUTAG, PROTEINS and NCI1.
+
+    - Five outer folds for each model and dataset produced 5 × 3 × 5 = 75 reference fits.
+
+    - Used the locked 500-epoch allowance and validation-loss checkpoint selection.
+
+- Corrected the evaluator file-placement mismatch before the successful run.
+
+    - Restored the four-value evaluate function to active src/evaluation.py and the original two-value implementation to archive/src/evaluation.py.
+
+    - Removed the interrupted initial CV outputs and restarted after restoring the per-fold Settings display.
+
+    - The display correction did not change the scientific configuration or training procedure.
+
+- The terminal output reached NCI1, GATv2, outer fold 4 and returned to PowerShell without a reported error.
+
+    - The final model/dataset group reported source commit c60bbd57fd1c7cc7e6bce3a4a51c6fdc54b0776f.
+
+    - Confirmed 75 cross-validation JSON records and 75 paired selected-state files in results.
+
+- Detailed result-group validation and calculation of fold means and sample standard deviations remain for Stage 6.6.
+
+- Commit: 6.5 recorded the reference cross-validation results
