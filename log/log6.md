@@ -1106,28 +1106,352 @@
 
 # 6.5 Final Reference Runs
 
-- Ran python -m experiments.train_cv for the complete reference matrix.
+- Executed the reference cross-validation matrix through python -m experiments.train_cv.
 
-    - Evaluated GCN, GraphSAGE, GIN, GAT and GATv2 on MUTAG, PROTEINS and NCI1.
+    - The reference models were GCN, GraphSAGE, GIN, GAT and GATv2.
 
-    - Five outer folds for each model and dataset produced 5 × 3 × 5 = 75 reference fits.
+    - Each model was evaluated on MUTAG, PROTEINS and NCI1 using the five outer folds established in Stage 6.4.
 
-    - Used the locked 500-epoch allowance and validation-loss checkpoint selection.
+    - This produced 5 × 3 × 5 = 75 separate fits, organised into 15 dataset/model groups.
 
-- Corrected the evaluator file-placement mismatch before the successful run.
+    - One group therefore means one model evaluated on one dataset across all five outer folds. For example, the GCN/MUTAG group contains five separately fitted GCN models.
 
-    - Restored the four-value evaluate function to active src/evaluation.py and the original two-value implementation to archive/src/evaluation.py.
+- Corrected an evaluator interface mismatch encountered at the first validation call of the initial execution.
 
-    - Removed the interrupted initial CV outputs and restarted after restoring the per-fold Settings display.
+    - src/training.py expected evaluate to return validation loss, validation accuracy, predictions and labels.
 
-    - The display correction did not change the scientific configuration or training procedure.
+    - The active src/evaluation.py still contained the earlier evaluate implementation returning only loss and accuracy, while the four-value implementation had been placed in the archive.
 
-- The terminal output reached NCI1, GATv2, outer fold 4 and returned to PowerShell without a reported error.
+    - Python therefore raised ValueError: not enough values to unpack (expected 4, got 2).
 
-    - The final model/dataset group reported source commit c60bbd57fd1c7cc7e6bce3a4a51c6fdc54b0776f.
+    - The failure occurred during validation in the first GCN/MUTAG outer fold, before that fold could complete and save its result.
 
-    - Confirmed 75 cross-validation JSON records and 75 paired selected-state files in results.
+    - Restored the four-value evaluate implementation to active src/evaluation.py and retained the original two-value implementation in archive/src/evaluation.py.
 
-- Detailed result-group validation and calculation of fold means and sample standard deviations remain for Stage 6.6.
+    - The unused prediction and label returns in the validation call were assigned to underscores. Validation still used only loss and accuracy, while the shared evaluator also supplied predictions and labels when the runner assessed the outer-test partition.
+
+    - This corrected the active function contract without changing the loss calculation, checkpoint-selection rule or experimental settings.
+
+- Restored the full per-fold Settings display in experiments/train_cv.py.
+
+    - The runner already printed the dataset and model at the start of each dataset/model group.
+
+    - The added loop over fold_settings.items() printed the effective setting names and values before each fit, including model identity, dataset, shared hyperparameters and fold-specific seeds.
+
+    - This made the actual configuration visible alongside the current outer fold instead of requiring the reader to refer back to an earlier group heading.
+
+    - The change affected terminal reporting rather than model construction, optimisation or recorded scientific settings.
+
+- The successful reference run used the fixed Stage 6.4 training and assessment procedure.
+
+    - Every fit constructed a fresh model and optimiser and completed the common 500-epoch allowance.
+
+    - Validation after every epoch selected the earliest state attaining the minimum validation cross-entropy.
+
+    - The selected state was restored after all 500 epochs and evaluated once on the corresponding outer-test graphs.
+
+    - The five fits within a group therefore assessed five different selected models on their respective held-out partitions. They were not repeated evaluations of one model or an ensemble.
+
+    - Each graph appeared in one outer-test fold within each model/dataset group. Corresponding models used the same partition indices, allowing later comparisons on matched held-out graphs.
+
+- The terminal output reached the final scheduled fit, GATv2 on NCI1 with outer-fold ID 4, and returned to PowerShell without a reported error.
+
+    - This fit used 2,877 fitting graphs, 411 validation graphs and 822 outer-test graphs.
+
+    - Its validation split seed was 1004 and its training seed was 2004, following the established 1000 + fold_id and 2000 + fold_id schedules.
+
+    - Training reached epoch 500, but the selected state came from epoch 484.
+
+    - The selected validation loss was 0.5622 and the selected validation accuracy was 0.7129.
+
+    - The epoch-500 validation loss was 0.5706. Restoring epoch 484 therefore retained the lower-validation-loss state rather than automatically using the final optimisation state.
+
+    - Epoch 484 was absent from the ten-epoch progress lines because checkpoint selection occurred every epoch while progress was printed every ten epochs.
+
+- The restored GATv2 state for NCI1 outer fold 4 obtained outer-test loss 0.5498 and accuracy 0.7251, approximately 72.51%.
+
+    - This accuracy described that fold's 822 held-out graphs. It was one of the five values contributing to the later GATv2/NCI1 summary.
+
+    - The model contained 13,570 parameters, all trainable.
+
+    - Its recorded training-pass time was 285.5012 seconds, giving 285.5012 / 500 = approximately 0.5710 seconds per training epoch.
+
+    - The timing covered all 500 training passes, including those after the selected epoch. It did not measure only the time required to reach epoch 484 or the complete elapsed time of the program.
+
+- The final fit saved results/cross_validation_gatv2_nci1_fold4_seed2004.pt and results/cross_validation_gatv2_nci1_fold4_seed2004.json.
+
+    - The .pt file preserved the restored validation-selected model state.
+
+    - The JSON preserved the associated effective settings, partition indices, selection evidence, outer-test predictions and labels, parameter counts, timing and execution provenance.
+
+    - The paired filenames identify the model, dataset, outer fold and training seed belonging to the same fit.
+
+- Confirmed that the completed reference run produced 75 JSON records and 75 paired model-state files.
+
+    - These 150 files matched the expected output count for 75 reference fits.
+
+    - The terminal output identified source commit c60bbd57fd1c7cc7e6bce3a4a51c6fdc54b0776f for the final model/dataset group.
+
+    - File counts and normal termination established completion of the run. Checking every group's identities, settings, partitions and prediction-derived measurements remained the purpose of Stage 6.6.
+
+    - The reference GAT and GATv2 records were retained for the later attention comparisons, and the selected reference-GAT states were retained for fitted-attention analysis without retraining.
 
 - Commit: 6.5 recorded the reference cross-validation results
+
+
+
+
+
+# 6.6 Necessary Summarisation
+
+- Added experiments/summarise.py to turn the saved reference records into validated accuracy and resource summaries.
+
+    - The script read the existing JSON records and loaded each dataset to check graph identities and labels.
+
+    - It checked that every paired model-state file existed but did not load those weights, repeat model inference or start training.
+
+    - One output row represented one dataset/model group containing five outer-fold fits.
+
+    - The complete reference matrix therefore produced 15 rows in the accuracy table and 15 rows in the parameter and runtime table.
+
+- Imported datasets, models, settings, model_settings and result_type from experiments/train_cv.py.
+
+    - The summary used the same configuration owner as the reference runner rather than maintaining another independently editable copy of the scientific settings.
+
+    - main copied the shared settings, applied the selected model's additional settings and assigned the current dataset and model.
+
+    - load_group then added the expected outer-fold ID, validation split seed and training seed when checking each record.
+
+    - Fold-specific settings were therefore allowed to differ according to the declared schedule while the common scientific recipe remained fixed.
+
+- get_partitions reconstructed the expected partition dictionaries for each dataset.
+
+    - stratified_folds reproduced the outer-test indices using the configured fold count and outer split seed.
+
+    - For each outer fold, the function constructed the remainder and passed it to stratified_validation_split with seed 1000 + fold_id.
+
+    - The returned dictionaries contained the expected fitting, validation and outer-test indices together with their partition seeds.
+
+    - These dictionaries were constructed once per dataset and reused when checking every model on that dataset.
+
+    - Comparing each saved partitions dictionary with its corresponding expected dictionary checked both graph membership and index order. This also established that compared models used the same partitions for a given outer fold.
+
+- load_group selected the reference JSON files using ordinary directory and string operations.
+
+    - os.listdir("results") returned the names inside the results directory, and sorted placed them in a consistent processing order.
+
+    - startswith selected the current reference prefix, such as cross_validation_gcn_mutag_fold, while endswith(".json") selected JSON records.
+
+    - This excluded historical development records, model-state files and separately named attention variants from the reference group.
+
+    - os.path.join combined the directory and filename into a path suitable for the operating system.
+
+    - os.path.normpath normalised paths before comparison, allowing Windows path separators to be compared consistently with the forward-slash paths stored in the records.
+
+- The group reader used a dictionary whose keys were the recorded outer-fold IDs.
+
+    - A second matching record claiming an already encountered fold ID raised an error rather than replacing the first record or being counted as another independent fold.
+
+    - Comparing the dictionary's keys with the set of expected fold IDs required exactly folds 0 through 4.
+
+    - The function returned the accepted records in numerical outer-fold order, which determined the order of the five accuracy columns.
+
+    - Each record also had to match its expected purpose, complete effective settings and filename generated by get_result_path.
+
+    - The recorded model_state_path had to identify the corresponding .pt file, and os.path.isfile checked that this file existed. This established the presence of the paired state rather than independently validating its contents.
+
+- Checked that each record represented the intended dataset, feature policy and checkpoint-selection procedure.
+
+    - The recorded dataset flags retained cleaned=False, use_node_attr=False and use_edge_attr=False.
+
+    - The feature policy retained categorical node information and connectivity while excluding continuous node attributes and edge features.
+
+    - Selection metadata had to specify minimum validation cross-entropy, the earliest exact tie rule, no early stopping and the configured 500 completed epochs.
+
+    - The selected epoch had to fall within the completed training allowance.
+
+    - Recorded training times and losses had to be finite and non-negative, and validation accuracy had to lie between zero and one.
+
+- Checked the alignment of outer-test graph identities, labels and predictions before accepting recorded accuracy.
+
+    - The original test_indices identified which dataset graphs belonged to the current outer-test fold and the order in which their predictions were recorded.
+
+    - dataset[index].y.item() retrieved the processed class label for each of those original graph indices.
+
+    - The resulting label list had to match the stored labels exactly, and predictions had to contain one valid class ID per label.
+
+    - zip(predictions, labels) paired each prediction with its corresponding true class.
+
+    - Summing the equality comparisons counted correctly classified graphs, and dividing by the number of labels recomputed accuracy.
+
+    - math.isclose compared the recomputed value with the stored accuracy using an absolute tolerance of 1e-12 and no relative tolerance. This allowed negligible floating-point differences without accepting a materially different measurement.
+
+- main collected all accepted groups before printing either summary table.
+
+    - Parameter counts had to agree across the five fits within a dataset/model group because fold membership does not change that model's architecture.
+
+    - The nested result lists were flattened into all_results for checks applying across the complete reference matrix.
+
+    - Device information, PyTorch version, PyG version, CUDA build and runtime-convention text had to agree across the records before their training times were presented together.
+
+    - first_result supplied those shared values for display after agreement had been checked.
+
+    - The source commits were collected into a set and sorted so every distinct recorded source revision was displayed once.
+
+- Ran python -m experiments.summarise successfully.
+
+    - The opening counts were 75 validated reference fits, 15 dataset/model groups and five outer folds per group.
+
+    - All records reported source commit c60bbd57fd1c7cc7e6bce3a4a51c6fdc54b0776f.
+
+    - The recorded device was the NVIDIA GeForce RTX 4070 Laptop GPU.
+
+    - The recorded software was PyTorch 2.13.0+cu130, PyG 2.8.0.post1 and CUDA build 13.0.
+
+    - Execution printed both complete tables and returned to PowerShell without a reported error.
+
+- The accuracy table retained the five individual outer-test accuracies before calculating their mean and sample standard deviation.
+
+    - Each value described the validation-selected model's performance on its own outer-test graphs.
+
+    - np.array collected the five recorded accuracy proportions, and multiplication by 100 converted them to percentages.
+
+    - accuracies.mean() calculated their unweighted arithmetic mean, giving each outer fold equal weight.
+
+    - For five percentage accuracies a_0 through a_4, the mean was (a_0 + a_1 + a_2 + a_3 + a_4) / 5.
+
+    - This differs from pooling all correct predictions and dividing by the total number of graphs when outer-fold sizes differ. The declared summary used the mean of fold accuracies.
+
+- accuracies.std(ddof=1) calculated the sample standard deviation across the five outer folds.
+
+    - NumPy's ddof argument reduces the variance denominator by the specified amount. With five values and ddof=1, the denominator was 5 - 1 = 4.
+
+    - The calculation was the square root of the sum of squared deviations from the fold mean divided by four.
+
+    - Because the input accuracies were percentages, the resulting standard deviation was expressed in percentage points.
+
+    - A larger value indicated greater variation among the five observed fold accuracies.
+
+    - This was descriptive fold variability, not a confidence interval or a measurement of variability from repeated training seeds on the same fixed split. The outer-fold fits also shared overlapping fitting data.
+
+- The GCN/MUTAG row illustrated the accuracy calculation.
+
+    - Outer folds 0 through 4 displayed accuracies of 78.95%, 81.58%, 86.84%, 64.86% and 75.68%.
+
+    - Their reported mean was 77.58%, with sample standard deviation 8.20 percentage points.
+
+    - The five values showed that the mean represented materially different fold outcomes rather than every fold achieving approximately the same score.
+
+    - MUTAG outer-test folds contained 37 or 38 graphs, so one additional correct prediction changed an individual fold's accuracy by approximately 2.6 to 2.7 percentage points.
+
+    - Calculations used the stored unrounded accuracies. The .2f formatting rounded only the displayed fold values, means and standard deviations.
+
+- The MUTAG reference summaries were recorded as mean accuracy followed by sample standard deviation.
+
+    - GCN: 77.58%, with SD 8.20 percentage points.
+
+    - GraphSAGE: 79.73%, with SD 6.10 percentage points.
+
+    - GIN: 81.35%, with SD 7.43 percentage points.
+
+    - GAT: 79.23%, with SD 5.19 percentage points.
+
+    - GATv2: 81.34%, with SD 6.98 percentage points.
+
+    - GIN and GATv2 had very close observed means. Their difference did not establish a meaningful performance advantage.
+
+- The PROTEINS reference summaries were also dataset-dependent.
+
+    - GCN: 74.57%, with SD 2.73 percentage points.
+
+    - GraphSAGE: 73.67%, with SD 3.17 percentage points.
+
+    - GIN: 72.59%, with SD 3.28 percentage points.
+
+    - GAT: 74.12%, with SD 2.37 percentage points.
+
+    - GATv2: 73.22%, with SD 2.78 percentage points.
+
+    - GCN had the highest observed mean on this dataset, so the attention models did not uniformly exceed the contextual message-passing references.
+
+- The NCI1 reference summaries differed again.
+
+    - GCN: 71.41%, with SD 0.67 percentage points.
+
+    - GraphSAGE: 73.38%, with SD 1.26 percentage points.
+
+    - GIN: 73.38%, with SD 1.79 percentage points.
+
+    - GAT: 72.31%, with SD 1.18 percentage points.
+
+    - GATv2: 71.97%, with SD 1.38 percentage points.
+
+    - GraphSAGE and GIN shared the highest displayed mean, but equality after rounding did not establish identical underlying accuracies or fold behaviour.
+
+    - Every model had lower observed fold SD on NCI1 than on MUTAG. This described these particular results rather than establishing a general relationship between dataset size and model stability.
+
+- The parameter table reported model size per fit rather than adding parameter counts across the five separately fitted models.
+
+    - Total parameters included every registered model parameter, while trainable parameters included those eligible for optimisation.
+
+    - The two counts were equal for every reference group.
+
+    - For example, GCN/MUTAG reported 4,802 total and trainable parameters per model. The table did not multiply this by five.
+
+    - GAT and GATv2 on NCI1 reported 6,978 and 13,570 parameters respectively.
+
+    - Their shared representation width therefore did not imply identical parameter counts. The standard attention formulations retained their different parameterisations.
+
+- The Training s column added the recorded training-pass seconds across the five fits in each group.
+
+    - The GCN/MUTAG group total was 65.04 seconds.
+
+    - This covered all 500 training passes of each fit, including epochs after the eventually selected checkpoint.
+
+    - Each group completed 5 × 500 = 2,500 training epochs.
+
+    - The s/epoch column divided summed training seconds by summed completed epochs. For GCN/MUTAG, 65.04 / 2,500 gave approximately 0.0260 seconds per training epoch.
+
+    - This was an average training-pass duration across the group, not the time for a minibatch or a complete training-and-validation cycle.
+
+- The printed runtime convention defined the boundaries of those timing measurements.
+
+    - Included operations were training-loader iteration, device transfer, forward computation, loss calculation, backpropagation, optimiser updates and training metric calculation and accumulation.
+
+    - Excluded operations were validation, outer-test evaluation, checkpoint copying and restoration, progress printing, model-state saving and JSON writing.
+
+    - Training s therefore did not represent the complete elapsed time spent waiting for a dataset/model group to finish.
+
+    - first_result["runtime"]["convention"] retrieved the common recorded description for display after the script had checked agreement across all records.
+
+- Recorded training cost increased substantially across the displayed dataset groups.
+
+    - GCN training-pass totals were 65.04 seconds on MUTAG, 302.54 seconds on PROTEINS and 1,106.23 seconds on NCI1.
+
+    - Their corresponding mean training-pass durations were 0.0260, 0.1210 and 0.4425 seconds per epoch.
+
+    - GATv2 had higher recorded training-pass totals than GAT on all three datasets.
+
+    - On NCI1, GAT recorded 1,393.68 seconds across the five fits and GATv2 recorded 1,427.94 seconds, corresponding to 0.5575 and 0.5712 seconds per training epoch.
+
+    - These measurements described the recorded hardware, software and workloads. They were not treated as hardware-independent operator costs.
+
+- The final Evidence line identified the naming structure of the source JSON records.
+
+    - results/cross_validation_<model>_<dataset>_fold<id>_seed<seed>.json was a printed template whose angle-bracket components represented the actual model, dataset, outer-fold ID and training seed.
+
+    - For example, results/cross_validation_gcn_mutag_fold0_seed2000.json identified the GCN/MUTAG record for outer fold 0 and training seed 2000.
+
+    - The line did not create a file or perform another search. The tables were printed to the terminal and could be regenerated by rerunning experiments.summarise against the preserved records.
+
+- The reference results showed no model leading consistently across all three datasets.
+
+    - GATv2 had a higher mean than GAT on MUTAG and lower means on PROTEINS and NCI1.
+
+    - These were descriptive observations under the fixed project pipeline, not significance tests, equivalence claims or reasons to change the experimental settings.
+
+    - Validation losses, selected epochs, partitions and predictions supported record validation, while the displayed summaries focused on outer-test accuracy, model size and training cost.
+
+    - The completed reference records remained the evidence source for the later GAT/GATv2 comparison, eight-head comparison and fitted reference-GAT analysis.
+
+- Commit: 6.6 added validated reference result summaries
