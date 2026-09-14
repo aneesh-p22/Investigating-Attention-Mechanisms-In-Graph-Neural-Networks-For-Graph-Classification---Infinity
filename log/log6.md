@@ -1294,11 +1294,23 @@
 
     - Device information, PyTorch version, PyG version, CUDA build and runtime-convention text had to agree across the records before their training times were presented together.
 
-    - first_result supplied those shared values for display after agreement had been checked.
+    - first_result supplied the shared device and software values for display after agreement had been checked.
 
     - The source commits were collected into a set and sorted so every distinct recorded source revision was displayed once.
 
-- Ran python -m experiments.summarise successfully.
+- Simplified the terminal presentation while retaining the existing validation and summary calculations.
+
+    - The accuracy heading became Outer-test accuracy (%), with separate columns for each outer fold, Mean and Sample SD.
+
+    - The resource heading became Parameters and training time, with explicit Total time (s) and Mean epoch time (s) columns.
+
+    - Retained one short clarification: Training passes only; time totals cover all outer folds.
+
+    - Removed the longer explanations of the timing calculations, the full runtime-convention paragraph and the generic evidence-path template from terminal output.
+
+    - Detailed explanations remained in the log, and the complete runtime convention remained in each JSON record.
+
+- Ran python -m experiments.summarise again after simplifying the output.
 
     - The opening counts were 75 validated reference fits, 15 dataset/model groups and five outer folds per group.
 
@@ -1309,6 +1321,8 @@
     - The recorded software was PyTorch 2.13.0+cu130, PyG 2.8.0.post1 and CUDA build 13.0.
 
     - Execution printed both complete tables and returned to PowerShell without a reported error.
+
+    - The displayed fold accuracies, means, sample standard deviations, parameter counts and training times matched the earlier summary. The revision changed presentation rather than the numerical results.
 
 - The accuracy table retained the five individual outer-test accuracies before calculating their mean and sample standard deviation.
 
@@ -1402,7 +1416,7 @@
 
     - Their shared representation width therefore did not imply identical parameter counts. The standard attention formulations retained their different parameterisations.
 
-- The Training s column added the recorded training-pass seconds across the five fits in each group.
+- The Total time (s) column added the recorded training-pass seconds across the five fits in each group.
 
     - The GCN/MUTAG group total was 65.04 seconds.
 
@@ -1410,19 +1424,21 @@
 
     - Each group completed 5 × 500 = 2,500 training epochs.
 
-    - The s/epoch column divided summed training seconds by summed completed epochs. For GCN/MUTAG, 65.04 / 2,500 gave approximately 0.0260 seconds per training epoch.
+    - The Mean epoch time (s) column divided summed training seconds by summed completed epochs. For GCN/MUTAG, 65.04 / 2,500 gave approximately 0.0260 seconds per training epoch.
 
     - This was an average training-pass duration across the group, not the time for a minibatch or a complete training-and-validation cycle.
 
-- The printed runtime convention defined the boundaries of those timing measurements.
+    - The recorded mean_seconds_per_epoch for each individual fit was also checked against its training_seconds divided by completed_epochs before the group summary was calculated.
+
+- The stored runtime convention defined the boundaries of those timing measurements.
 
     - Included operations were training-loader iteration, device transfer, forward computation, loss calculation, backpropagation, optimiser updates and training metric calculation and accumulation.
 
     - Excluded operations were validation, outer-test evaluation, checkpoint copying and restoration, progress printing, model-state saving and JSON writing.
 
-    - Training s therefore did not represent the complete elapsed time spent waiting for a dataset/model group to finish.
+    - Total time (s) therefore did not represent the complete elapsed time spent waiting for a dataset/model group to finish.
 
-    - first_result["runtime"]["convention"] retrieved the common recorded description for display after the script had checked agreement across all records.
+    - The summariser continued checking that the recorded runtime-convention descriptions agreed, even though the full description was no longer printed.
 
 - Recorded training cost increased substantially across the displayed dataset groups.
 
@@ -1436,13 +1452,13 @@
 
     - These measurements described the recorded hardware, software and workloads. They were not treated as hardware-independent operator costs.
 
-- The final Evidence line identified the naming structure of the source JSON records.
-
-    - results/cross_validation_<model>_<dataset>_fold<id>_seed<seed>.json was a printed template whose angle-bracket components represented the actual model, dataset, outer-fold ID and training seed.
+- The summaries remained reproducible from the preserved reference JSON records.
 
     - For example, results/cross_validation_gcn_mutag_fold0_seed2000.json identified the GCN/MUTAG record for outer fold 0 and training seed 2000.
 
-    - The line did not create a file or perform another search. The tables were printed to the terminal and could be regenerated by rerunning experiments.summarise against the preserved records.
+    - The associated .pt file preserved that fit's selected model state, while the JSON supplied the values used by the summariser.
+
+    - Both tables were printed to the terminal and could be regenerated by running python -m experiments.summarise.
 
 - The reference results showed no model leading consistently across all three datasets.
 
@@ -1455,3 +1471,101 @@
     - The completed reference records remained the evidence source for the later GAT/GATv2 comparison, eight-head comparison and fitted reference-GAT analysis.
 
 - Commit: 6.6 added validated reference result summaries
+
+
+
+
+
+# Stage 6 Closing Notes
+
+- Decisions
+
+    - Completed the dataset scope with MUTAG, PROTEINS and NCI1. All four agreed research questions use these same datasets so comparisons retain a common assessment basis.
+
+    - Retained the established input policy: categorical node information and graph connectivity are supplied to the models, while continuous node attributes and edge features are excluded. Dataset-specific input widths remain appropriate because the categorical vocabularies differ.
+
+    - Fixed the investigation at four questions: first-layer attention-head count, standard GAT versus standard GATv2, uniform-attention retraining, and fitted reference-GAT attention characterisation with a uniform-attention intervention.
+
+    - Retained the shared two-layer graph-classification structure, hidden width 64, ReLU after both complete convolutions, sum pooling and linear graph classifier. Adam uses learning rate 0.01, weight decay 0.0005 and batch size 32.
+
+    - Fixed the common assessment allowance at 500 epochs before any cross-validation results were available. The development-validation convergence audit supported this as a practical computational compromise; it did not establish that every configuration would reach its eventual minimum validation loss within 500 epochs.
+
+    - Adopted five stratified outer folds, with one fresh fit per model and outer fold. Each outer remainder is divided into fitting and validation partitions, giving approximately 70/10/20 of the complete dataset for fitting, validation and outer-test assessment.
+
+    - Fixed outer split seed 0, validation split seed 1000 + fold_id and training seed 2000 + fold_id. Corresponding models and variants use the same partition indices and scheduled seeds.
+
+    - Retained validation-loss checkpoint selection without early stopping. Every valid fit completes all 500 epochs, preserves the earliest state attaining the minimum validation cross-entropy, restores that state and evaluates the outer-test partition once.
+
+    - Added finite-loss guards so numerical failure stops a fit before it can be accepted as a completed reference result. An earlier valid checkpoint does not justify recording a run containing non-finite training or validation losses.
+
+    - Made experiments/train_cv.py the configuration owner and reference-training entry point. experiments/ablation.py derives its settings from that runner and uses the same cross-validation function.
+
+    - Preserved superseded implementations in the mirrored archive/src and archive/experiments directories. The active evaluator returns loss, accuracy, predictions and labels; the original two-value evaluator remains archived.
+
+    - Retained scientific qualifiers such as outer_folds, outer_split_seed, validation_split_seed and selected_epoch. The outer assessment remains an outer assessment when validation uses a single holdout rather than inner cross-validation.
+
+    - Required one JSON evidence record and one paired validation-selected model state for every recorded reference fit. Existing output paths are rejected before fitting the corresponding dataset/model group, preventing silent replacement of recorded evidence.
+
+    - Added reference summarisation only after the records existed. experiments/summarise.py uses os.listdir and filename checks, validates complete groups and calculates the declared statistics from preserved measurements.
+
+    - Kept terminal output focused on identities, settings, measurements and brief clarifications. Explanations of calculations, methodology and interpretation belong in the logs. The simplified summary output retained the same numerical results.
+
+    - Preserved the fixed settings after observing the reference results. Dataset-dependent model ordering did not trigger another search, selective reruns or changes to the agreed comparisons.
+
+- Ideas
+
+    - Carried forward the agreed investigation of what the fitted reference GAT actually learns about neighbourhood weighting. The analysis will use the selected reference states and their corresponding outer-test graphs, keeping each graph's assessment out of fold.
+
+    - The agreed characterisation will measure departure from uniform attention separately for both GAT layers, with receiver-level measurements aggregated within graphs and graphs weighted equally within each fold.
+
+    - The accompanying fitted intervention will replace learned attention scoring with uniform weighting while retaining the fitted message transformations and classifier. This will measure prediction sensitivity without retraining and remains distinct from training a fresh uniform-attention model.
+
+    - These investigations are already part of the four-question scope. No further experiment was adopted in response to the observed reference rankings.
+
+- Report notes
+
+    - PROTEINS contains 1,113 graphs and three loaded categorical node-feature channels. One continuous node attribute is available but excluded by the project policy. NCI1 contains 4,110 graphs and 37 categorical node-feature channels, with no continuous node attributes. Both datasets have two processed graph classes and no loaded edge features.
+
+    - The ordinary GCN development fits established that the shared loading, batching, training and selected-state recording path operated on PROTEINS and NCI1. Their approximately 80/10/10 development results remain separate from the later five-fold assessment results.
+
+    - The epoch-budget audit recorded 27 development-validation trajectories covering nine configurations on three datasets. In the clean rerun, 16 trajectories had reached their eventual minimum validation loss by epoch 500. The median remaining loss gap was zero, the mean was approximately 0.00476 and the maximum was approximately 0.06177.
+
+    - The clean audit recorded 7,928.40 elapsed seconds, approximately 2.20 hours, in results/development_epoch_budget_audit.json. The earlier interrupted audit remains separate historical evidence and is not the source of these clean-run measurements.
+
+    - The epoch allowance was informed by development validation on the same benchmark datasets later used for cross-validation. It was fixed before CV outcomes and was not chosen using development-test scores. Methods must describe this sequence, and Limitations must acknowledge that the earlier benchmark use prevents claiming complete assessment independence from the budget decision.
+
+    - Within each CV fit, fitting, validation and outer-test indices are disjoint. Validation chooses the checkpoint, while the outer-test partition measures the selected model's held-out performance. This within-fold separation does not remove the earlier dataset reuse in the budget decision.
+
+    - The reference matrix completed 75 fits: five models on three datasets across five outer folds. The repository contains 75 corresponding JSON records and 75 paired model-state files.
+
+    - All reference records reported source commit c60bbd57fd1c7cc7e6bce3a4a51c6fdc54b0776f. Their recorded environment used the NVIDIA GeForce RTX 4070 Laptop GPU, PyTorch 2.13.0+cu130, PyG 2.8.0.post1 and CUDA build 13.0.
+
+    - experiments/summarise.py accepted all 15 complete reference groups. Its checks covered effective settings, scheduled seeds, expected partitions, original-index label alignment, prediction-derived accuracy, selection metadata, parameter-count consistency, paired state-file existence and recorded runtime conditions.
+
+    - Reported accuracy is the unweighted mean of five outer-fold accuracies, accompanied by sample standard deviation calculated with ddof=1. Accuracy is expressed as a percentage and SD in percentage points. The individual fold values remain available for matched comparisons.
+
+    - Fold SD describes variation in the observed five-fold procedure. It is not a confidence interval, a significance test or an estimate obtained from repeated training seeds on an unchanged split. The outer-fold fits also share overlapping fitting data.
+
+    - The reference results showed dataset-dependent model ordering. GIN and GATv2 had close MUTAG means of 81.35% and 81.34%. GCN had the highest PROTEINS mean at 74.57%. GraphSAGE and GIN both displayed a NCI1 mean of 73.38%, without establishing identical underlying fold behaviour.
+
+    - GATv2 had a higher mean than GAT on MUTAG and lower means on PROTEINS and NCI1. The comparison does not establish a universal advantage for either formulation or isolate query-dependent attention from all other parameterisation differences.
+
+    - MUTAG had the largest observed fold SD for every reference model. Its outer-test folds contain only 37 or 38 graphs, so a single correct prediction changes a fold's accuracy by approximately 2.6 to 2.7 percentage points.
+
+    - Parameter counts are reported per fitted model, with total and trainable counts distinguished. All reference-model parameters were trainable. The distinction remains necessary for the later uniform-attention model because its scoring parameters are frozen.
+
+    - Runtime summaries use training-pass seconds, covering minibatch loading, device transfer, forward computation, loss, backpropagation, optimisation and training metric accumulation. Validation, outer testing, checkpoint copying and restoration, printing and file saving are excluded.
+
+    - Each reference group completed 2,500 training epochs across its five fits. Total time (s) sums their training-pass times, while Mean epoch time (s) divides that total by their completed epochs. These quantities are distinct from complete program elapsed time.
+
+    - GATv2 had more parameters and higher recorded training-pass totals than GAT on all three datasets. These observations apply to the recorded implementation, hardware and workloads.
+
+    - The complete fold values, means, sample SDs, parameter counts and training times can be regenerated with python -m experiments.summarise from the preserved cross_validation JSON records in results/.
+
+    - The eight-head GAT and GATv2 reference groups will be reused for the relevant Stage 7 comparisons. The remaining optimisation work is 45 fits for the additional one-, two- and four-head GAT variants and 15 fits for uniform GAT, bringing the planned total to 135 fits.
+
+    - The fitted-attention characterisation and intervention reuse the 15 selected reference-GAT states and require no additional optimisation fits. Those analyses and the remaining 60 training fits have not yet been executed.
+
+    - Stage 6 established the reference evidence and the common procedure for the attention investigation. Substantive manuscript drafting remains for the dedicated report phase.
+
+- Commit: Stage 6 recorded closing decisions and report notes
