@@ -16,10 +16,14 @@ GraphSAGE and GIN as contextual baselines, on MUTAG, PROTEINS and NCI1.
 
 ## Development status
 
-Implementation through Stage 6.4 is present. Dataset and model inspections,
-development fits and the epoch-budget audit are recorded in log/ and results/.
-The cross-validation protocol is implemented; the Stage 6.5 reference fits
-have not yet been run in this snapshot.
+Implementation through Stage 6.6 is present. The 75 reference cross-validation
+fits are complete, with paired JSON records and selected model states in
+results/. experiments/summarise.py validates the reference groups and prints
+accuracy, parameter-count and training-time summaries.
+
+The additional attention-head and uniform-attention fits, followed by fitted
+attention analysis, remain for Stage 7. Development observations and
+reference results are documented in log/.
 
 
 
@@ -29,6 +33,9 @@ have not yet been run in this snapshot.
   evaluation and result recording.
 - experiments/train_cv.py owns the current shared settings and runs the
   reference cross-validation matrix. It was previously named run_cv.py.
+- experiments/summarise.py reads and validates the saved reference records,
+  then reports five outer-fold accuracies, their unweighted mean and sample
+  standard deviation, parameter counts and training-pass times.
 - experiments/ablation.py defines the attention variants and reuses the same
   settings and cross-validation function. Running this module directly only
   prints the variant definitions and example result paths.
@@ -72,22 +79,32 @@ the fitted-attention analysis and intervention reuse selected GAT states.
 ## Running the code
 
 Run modules from the repository root in the configured environment.
-The existing partition and ablation inspections do not train models:
+Summarise the saved reference results with:
+
+```powershell
+python -m experiments.summarise
+```
+
+The partition and ablation inspections do not train models:
 
 ```powershell
 python -m experiments.inspections.inspect_cv_splits
 python -m experiments.ablation
 ```
 
-After committing the reviewed source and settings, the following command
-starts the 75 reference fits. It is a training command, not an inspection:
+The following command trains the 75 reference fits. Commit the source and
+settings before starting a recorded run:
 
 ```powershell
 python -m experiments.train_cv
 ```
 
 Each fold saves a paired JSON record and validation-selected .pt state.
-Existing result or state paths are rejected before fitting that model/dataset
+The repository already contains the completed reference results, so the
+training command will refuse their existing output paths. Summarisation
+uses those records directly.
+
+Existing result or state paths are checked before fitting each model/dataset
 group. Completed groups must be excluded explicitly when continuing a
 partially completed matrix. Record source and settings before fitting,
 then record results and logs afterwards.

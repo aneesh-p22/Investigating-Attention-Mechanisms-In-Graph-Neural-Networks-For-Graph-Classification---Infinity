@@ -235,7 +235,7 @@ def main():
         print(source_commit)
 
     print()
-    print("Outer-test accuracy (%); unweighted mean and sample SD across outer folds:")
+    print("Outer-test accuracy (%):")
     fold_columns = " | ".join(
         f"Outer fold {fold_id}" for fold_id in range(settings["num_folds"])
     )
@@ -254,8 +254,12 @@ def main():
         )
 
     print()
-    print("Parameter counts per fit and training-pass times:")
-    print("Dataset | Model | Total parameters | Trainable parameters | Training s | s/epoch")
+    print("Parameters and training time:")
+    print("Training passes only; time totals cover all outer folds.")
+    print(
+        "Dataset | Model | Total parameters | Trainable parameters | "
+        "Total time (s) | Mean epoch time (s)"
+    )
 
     for results in groups:
         current_settings = results[0]["settings"]
@@ -268,12 +272,6 @@ def main():
             f"{parameters['total']} | {parameters['trainable']} | "
             f"{training_seconds:.2f} | {training_seconds / completed_epochs:.4f}"
         )
-
-    print()
-    print("Training s is the sum across all outer folds in each group.")
-    print("s/epoch is that sum divided by the total completed epochs in the group.")
-    print("Runtime convention:", first_result["runtime"]["convention"])
-    print("Evidence: results/cross_validation_<model>_<dataset>_fold<id>_seed<seed>.json")
 
 
 if __name__ == "__main__":
