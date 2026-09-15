@@ -1049,3 +1049,317 @@
     - The saved JSON retains the graph-level evidence needed to reconstruct the reported fold and dataset summaries.
 
 - Commit: 7.4 analysed fitted reference-GAT attention and uniform intervention
+
+
+
+
+
+# 7.5 Cross-Experiment Evidence Notes
+
+- Mapped the four Stage 7 research questions to their exact experimental evidence, observed answer and main qualification.
+
+    - The four questions form one connected investigation of graph attention design rather than four independent experiments.
+
+    - RQ1 changes the organisation of multi-head attention while fixing total first-layer width.
+
+    - RQ2 changes the attention-scoring formulation from standard GAT to standard general-form GATv2.
+
+    - RQ3 compares learned attention with a separately retrained uniform-attention GAT.
+
+    - RQ4 characterises the coefficients learned by fitted reference GATs and measures the sensitivity of those same fitted models to removing learned attention scoring without retraining.
+
+    - Negative, mixed and dataset-dependent outcomes were retained rather than converted into a single preferred attention configuration.
+
+- RQ1 asked how first-layer GAT head count affects graph-classification performance when total first-layer representation width remains fixed at 64.
+
+    - Heads 1, 2, 4 and 8 were compared on MUTAG, PROTEINS and NCI1.
+
+    - Their channels per head were 64, 32, 16 and 8 respectively.
+
+    - Total first-layer width and overall GAT parameter count therefore remained fixed within each dataset.
+
+    - MUTAG mean accuracies were 76.51%, 77.07%, 75.48% and 79.23% for 1, 2, 4 and 8 heads.
+
+    - PROTEINS means were 73.94%, 73.40%, 73.94% and 74.12%.
+
+    - NCI1 means were 71.31%, 72.51%, 72.09% and 72.31%.
+
+    - The observed relationship was non-monotonic on every dataset.
+
+    - Eight heads had the highest observed mean on MUTAG and PROTEINS, while two heads had the highest observed mean on NCI1.
+
+    - PROTEINS showed only a 0.72 percentage-point range between the highest and lowest observed means.
+
+    - No head count was highest on every dataset or every outer fold.
+
+- The observed answer to RQ1 is therefore that head count affected performance in a dataset-dependent way under fixed total width, with no evidence of a general monotonic benefit from increasing the number of heads.
+
+    - The comparison isolates head organisation more cleanly than a design in which additional heads also increase total representation width.
+
+    - It does not establish a universally optimal head count.
+
+    - It also does not test the effect of increasing head count and total representation width together.
+
+    - The fold means and sample standard deviations are descriptive summaries of five outer folds rather than significance or equivalence tests.
+
+- A possible explanation for the non-monotonic RQ1 behaviour is the fixed-width trade-off between attention diversity and per-head channel width.
+
+    - More heads provide more separately learned attention distributions.
+
+    - Under fixed total width, however, each individual head becomes narrower.
+
+    - Redundant head behaviour could also reduce the benefit of adding heads.
+
+    - These are mechanism-based explanations consistent with the design, not effects separately identified by the experiment.
+
+- RQ2 asked how standard GAT compares with standard general-form GATv2 under the common graph-classification pipeline.
+
+    - The comparison reused the 30 existing reference fits and required no new optimisation.
+
+    - MUTAG mean accuracy was 79.23% for GAT and 81.34% for GATv2.
+
+    - The paired GATv2-minus-GAT fold differences on MUTAG were +7.89, 0.00, +2.63, -5.41 and +5.41 percentage points.
+
+    - Their mean was +2.11 percentage points with sample SD 5.14 points.
+
+    - PROTEINS mean accuracy was 74.12% for GAT and 73.22% for GATv2.
+
+    - Its paired differences were -1.35, +0.45, -0.90, -1.35 and -1.35 points.
+
+    - Their mean was -0.90 points with sample SD 0.78 points.
+
+    - NCI1 mean accuracy was 72.31% for GAT and 71.97% for GATv2.
+
+    - Its paired differences were +0.85, 0.00, -0.61, -1.70 and -0.24 points.
+
+    - Their mean was -0.34 points with sample SD 0.93 points.
+
+- The observed answer to RQ2 is therefore that GATv2 did not provide a consistent predictive advantage over GAT under this project pipeline.
+
+    - GATv2 had the higher observed mean on MUTAG.
+
+    - GAT had the higher observed mean on PROTEINS and NCI1.
+
+    - The theoretical ability of GATv2 to use query-dependent neighbour ranking therefore did not imply an accuracy improvement on every dataset.
+
+    - The result does not contradict the theoretical distinction between static GAT ranking and dynamic GATv2 ranking.
+
+- RQ2 is not a capacity-equal causal test of dynamic attention ranking.
+
+    - MUTAG GAT contained 5,058 parameters while GATv2 contained 9,730.
+
+    - PROTEINS counts were 4,802 and 9,218.
+
+    - NCI1 counts were 6,978 and 13,570.
+
+    - The project intentionally retained the standard general-form GATv2 with share_weights=False rather than forcing its parameter count to match GAT.
+
+    - Any observed accuracy difference can therefore reflect the complete model formulations rather than only the static-versus-dynamic ranking distinction.
+
+- RQ3 asked whether learning non-uniform GAT neighbourhood coefficients improves performance relative to training the same GAT architecture with uniform attention throughout optimisation.
+
+    - The learned condition reused the 15 reference GAT fits.
+
+    - The uniform condition used 15 fresh fits with both layers' attention-scoring tensors fixed at zero.
+
+    - MUTAG learned GAT mean accuracy was 79.23% and Uniform GAT mean accuracy was 80.83%.
+
+    - Learned-minus-uniform fold differences were -2.63, -2.63, 0.00, -2.70 and 0.00 percentage points.
+
+    - Their mean was -1.59 points with sample SD 1.45 points.
+
+    - PROTEINS means were 74.12% learned and 73.58% uniform.
+
+    - Its fold differences were +0.45, +0.45, -1.79, +3.60 and 0.00 points.
+
+    - Their mean was +0.54 points with sample SD 1.95 points.
+
+    - NCI1 means were 72.31% learned and 71.09% uniform.
+
+    - Its fold differences were +0.36, +0.61, +1.95, +1.09 and +2.07 points.
+
+    - Their mean was +1.22 points with sample SD 0.77 points.
+
+- The observed answer to RQ3 is therefore dataset-dependent.
+
+    - Uniform-attention retraining had the higher observed mean on MUTAG.
+
+    - PROTEINS showed only a small mean difference with mixed fold directions.
+
+    - NCI1 favoured learned attention in all five outer folds.
+
+    - The NCI1 result is the clearest descriptive evidence in RQ3 for a performance benefit from learning non-uniform coefficients during training.
+
+    - The results do not establish that learned attention is universally beneficial or universally unnecessary.
+
+    - Small retraining differences do not establish statistical equivalence.
+
+- RQ3 changes the optimisation problem as well as the attention coefficients.
+
+    - A Uniform GAT is trained from the beginning under the uniform-attention constraint.
+
+    - Its message transformations and classifier can therefore adapt throughout optimisation to that constraint.
+
+    - RQ3 cannot establish whether an already fitted learned-attention GAT would remain unchanged if its learned weighting were removed after training.
+
+    - That distinction motivated the fitted-model component of RQ4.
+
+- RQ4 first asked how far the attention coefficients of the fitted reference GATs depart from uniform neighbourhood weighting.
+
+    - Departure was measured as one minus normalised attention entropy.
+
+    - Zero denotes uniform weighting and larger values denote more concentrated attention.
+
+    - Conv1 departure was calculated separately for each of its eight heads before averaging heads at receiver level.
+
+    - Eligible receivers were averaged within graphs and graphs equally within outer folds.
+
+    - Conv1 mean departures were 0.0091 on MUTAG, 0.0092 on PROTEINS and 0.0268 on NCI1.
+
+    - Their sample SDs were 0.0082, 0.0068 and 0.0108 respectively.
+
+    - Conv1 therefore remained close to uniform on average across all three datasets under this aggregate measure.
+
+- Conv2 attention departure was much more dataset-dependent.
+
+    - MUTAG Conv2 fold departures were 0.0654, 0.1808, 0.2481, 0.0366 and 0.0518.
+
+    - Its mean was 0.1165 with sample SD 0.0931.
+
+    - PROTEINS fold departures were 0.0408, 0.0000, 0.0000, 0.0495 and 0.0000 at four-decimal reporting precision.
+
+    - Its mean was 0.0181 with sample SD 0.0249.
+
+    - NCI1 fold departures were 0.3198, 0.3015, 0.2017, 0.3774 and 0.2105.
+
+    - Its mean was 0.2822 with sample SD 0.0750.
+
+    - NCI1 therefore showed the strongest and most consistently non-uniform second-layer attention of the three datasets.
+
+- RQ4 then asked how the same fitted reference GATs respond when their learned attention scoring is replaced by uniform weighting without retraining.
+
+    - Only conv1.att_src, conv1.att_dst, conv2.att_src and conv2.att_dst were zeroed in the intervention copy.
+
+    - Every other fitted state tensor was preserved.
+
+    - MUTAG mean delta loss was +0.0346 with sample SD 0.0404.
+
+    - MUTAG mean delta accuracy was -1.10 percentage points with sample SD 4.86 points.
+
+    - Its mean prediction-flip rate was 10.71% with sample SD 7.45%.
+
+    - The MUTAG accuracy effect had mixed fold directions.
+
+    - PROTEINS mean delta loss was +0.0499 with sample SD 0.0621.
+
+    - PROTEINS mean delta accuracy was -5.75 percentage points with sample SD 8.36 points.
+
+    - Its mean prediction-flip rate was 13.30% with sample SD 14.31%.
+
+    - PROTEINS therefore showed stronger but highly variable fitted-model sensitivity.
+
+    - NCI1 mean delta loss was +0.4233 with sample SD 0.1443.
+
+    - NCI1 mean delta accuracy was -20.32 percentage points with sample SD 1.34 points.
+
+    - Its mean prediction-flip rate was 41.82% with sample SD 4.28%.
+
+    - Every NCI1 fold had higher loss and lower accuracy after the intervention.
+
+- The observed answer to RQ4 is therefore strongly layer-dependent and dataset-dependent.
+
+    - First-layer attention remained close to uniform on average on all three datasets.
+
+    - Second-layer attention ranged from near-uniform on PROTEINS to substantially non-uniform on NCI1.
+
+    - Removing learned attention scoring produced modest mixed accuracy effects on MUTAG, highly variable effects on PROTEINS and a large consistent degradation on NCI1.
+
+    - Learned attention weighting was therefore neither universally essential nor universally dispensable for the fitted reference GATs.
+
+- RQ3 and RQ4 provide complementary rather than contradictory evidence.
+
+    - On MUTAG, Uniform GAT retraining exceeded the learned GAT mean by 1.59 percentage points, while the fitted intervention changed accuracy by -1.10 points on average with mixed fold directions.
+
+    - On PROTEINS, learned-attention retraining exceeded uniform retraining by only 0.54 points on average, while the fitted intervention changed accuracy by -5.75 points on average.
+
+    - On NCI1, learned-attention retraining exceeded uniform retraining by 1.22 points on average, while the fitted intervention reduced accuracy by 20.32 points on average.
+
+    - A separately retrained uniform model can adapt its remaining parameters to the uniform-attention constraint.
+
+    - An already fitted learned-attention model subjected to the RQ4 intervention receives no opportunity for such compensation.
+
+    - A small RQ3 retraining difference therefore cannot be interpreted as evidence that the fitted learned-attention solution is insensitive to its attention mechanism.
+
+- Attention concentration and fitted-model sensitivity were not treated as equivalent quantities.
+
+    - NCI1 combined the largest Conv2 departure with the largest and most consistent intervention effect.
+
+    - PROTEINS nevertheless showed that small average attention departure can coexist with substantial prediction changes in some folds.
+
+    - RQ4 intervened on attention scoring in both layers simultaneously.
+
+    - The experiment therefore does not establish that Conv2 concentration caused the observed NCI1 intervention effect.
+
+    - It also does not establish a general quantitative relationship between entropy departure and predictive importance.
+
+- Several possible explanations remain distinct from the measured observations.
+
+    - RQ1 behaviour may reflect a trade-off between the number of independently learned heads and the reduced channel width available to each head under fixed total representation width.
+
+    - RQ2 behaviour may partly reflect the larger parameterisation of the chosen general-form GATv2 as well as its different scoring mechanism.
+
+    - RQ3 and RQ4 differ because retraining permits optimisation of the remaining parameters under the imposed attention condition while the fitted intervention does not.
+
+    - Dataset size, graph structure, feature distributions and finite-sample variation may contribute to the different fold behaviours observed across MUTAG, PROTEINS and NCI1.
+
+    - These possibilities were not isolated experimentally and are therefore explanatory hypotheses rather than findings.
+
+- All Stage 7 conclusions are conditional on the project's controlled feature and optimisation choices.
+
+    - Principal models use categorical node features and graph connectivity.
+
+    - Continuous node attributes and edge features are excluded from the core forwards.
+
+    - The findings therefore describe attention behaviour under this feature-access policy rather than every possible representation of the three datasets.
+
+    - Every final fit used the same two-layer architecture policy, hidden width 64, global sum readout, fixed optimisation settings, five-fold assessment procedure and predetermined seed schedule.
+
+    - This consistency strengthens within-project comparisons but does not make the results universal beyond the studied configurations and datasets.
+
+- Fold-level uncertainty was retained explicitly.
+
+    - Every reported Stage 7 performance comparison preserves all five outer-fold values.
+
+    - Arithmetic means summarise those five observations.
+
+    - Sample standard deviations describe variation among them.
+
+    - The folds have overlapping fitting sets and are not independent repeated-seed trials.
+
+    - No significance, confidence-interval or equivalence claim is made from the five folds.
+
+    - Mixed fold directions remain part of the evidence rather than being hidden by mean values.
+
+- The combined Stage 7 evidence does not support a single universally preferable attention design.
+
+    - More attention heads did not monotonically improve accuracy.
+
+    - GATv2 did not consistently outperform standard GAT.
+
+    - Learned non-uniform attention during retraining did not improve mean accuracy on every dataset.
+
+    - Fitted-model sensitivity to removing learned weighting varied substantially between datasets.
+
+    - The strongest consistent attention-specific effect was the NCI1 fitted intervention, but that result is not promoted into a universal claim.
+
+- The Stage 7 evidence is sufficient for the planned core attention investigation.
+
+    - No additional intervention, synthetic task, dataset or post hoc attention statistic was introduced to obtain a cleaner result.
+
+    - No observed unfavourable or inconsistent outcome was used to redefine the research questions.
+
+    - The substantive broader Discussion remains for the report phase.
+
+    - The next Stage 7 work is Closing Notes followed by the complete Review 7.
+
+- Commit: 7.5 synthesised the core attention evidence
