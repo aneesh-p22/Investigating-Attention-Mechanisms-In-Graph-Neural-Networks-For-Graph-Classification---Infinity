@@ -324,3 +324,53 @@
     - The completed findings supported qualified answers to all four questions while preserving negative, mixed and dataset-dependent results.
 
 - Commit: 8.2 consolidated research findings and source notes
+
+
+
+
+
+# 8.3 Optional Traditional Baseline Disposition
+
+- Deferred the optional graph-kernel and simple-classifier comparison.
+
+    - No kernel method, classifier configuration or validation-based selection procedure had been established for this comparison.
+
+    - Completing it would require a separate implementation and evaluation path.
+
+    - The existing implementation used NumPy, PyTorch and PyTorch Geometric, with Matplotlib available for figures.
+
+    - A graph-kernel and conventional classifier package was not part of the declared dependencies.
+
+    - A sound traditional comparison remained a possible extension rather than introducing an inadequately specified baseline into the completed investigation.
+
+- The deferral reflected implementation scope rather than an observed performance result.
+
+    - No graph-kernel classifier was trained or assessed.
+
+    - No conclusion was drawn about whether such a method would perform better or worse than the evaluated neural models.
+
+    - The completed evidence remained 135 neural optimisation fits and the fitted-attention analysis of 15 selected reference GAT states.
+
+- Retained the distinction between contextual neural baselines and traditional graph methods.
+
+    - GCN, GraphSAGE and GIN provided contextual neural comparisons for GAT and GATv2.
+
+    - These models did not substitute for an empirical graph-kernel comparison.
+
+    - The results supported comparisons among the evaluated neural formulations and answers to the four attention questions under the fixed experimental conditions.
+
+    - They did not establish superiority over graph kernels or non-neural graph classifiers.
+
+- Identified the requirements for a possible future traditional comparison.
+
+    - Specify the graph kernel, classifier and any selectable hyperparameters before assessment.
+
+    - Use compatible graph information and document any differences in feature access.
+
+    - Separate validation-based selection from outer-test assessment.
+
+    - Preserve the selected settings, partitions, predictions and evaluation results.
+
+    - Treat the existing neural findings as prior information rather than claiming that a subsequently designed comparison was specified independently of them.
+
+- Commit: 8.3 deferred the optional traditional baseline
