@@ -333,9 +333,7 @@ def print_summary(dataset_results):
     print("Uniform-attention intervention:")
     print("Delta loss is intervention minus learned.")
     print("Delta accuracy is intervention minus learned.")
-    print(
-        f"Dataset | Measure | {fold_columns} | Mean | Sample SD"
-    )
+    print(f"Dataset | Measure | {fold_columns} | Mean | Sample SD")
 
     measures = [
         ("delta_loss", "Delta loss", 1.0, 4),
@@ -365,6 +363,11 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     device_name = torch.cuda.get_device_name(device) if device.type == "cuda" else "CPU"
 
+    print()
+    print("Analysis source commit:", source_commit)
+    print("Device:", device)
+    print("Analysis: fitted reference-GAT attention and uniform intervention")
+
     dataset_results = {}
     reference_source_commits = set()
 
@@ -378,12 +381,32 @@ def main():
         current_settings["model"] = "GAT"
 
         reference_results = load_group(current_settings, dataset, partitions)
-        folds = [
-            analyse_fold(result, current_settings, dataset, device)
-            for result in reference_results
-        ]
-
         reference_source_commits.add(reference_results[0]["source_commit"])
+
+        print()
+        print("Dataset:", dataset_name)
+        print("Reference source commit:", reference_results[0]["source_commit"])
+
+        folds = []
+
+        for result in reference_results:
+            fold_id = result["settings"]["fold_id"]
+
+            print()
+            print("Outer fold:", fold_id)
+            print("Selected epoch:", result["selection"]["selected_epoch"])
+            print("Outer-test graphs:", len(result["partitions"]["test_indices"]))
+            print("Analysing fitted attention and intervention")
+
+            folds.append(
+                analyse_fold(
+                    result,
+                    current_settings,
+                    dataset,
+                    device,
+                )
+            )
+
         dataset_results[dataset_name] = {
             "folds": folds,
             "summary": summarise_dataset(folds),
@@ -418,13 +441,16 @@ def main():
 
     save_result(result_path, result)
 
+    print()
     print("RQ4 fitted reference-GAT analysis:")
     print("Selected reference states:", selected_state_count)
     print("New optimisation fits: 0")
     print("Analysis source commit:", source_commit)
     print("Reference source commit:", reference_source_commit)
+
     print()
     print_summary(dataset_results)
+
     print()
     print("Saved result:", result_path)
 
