@@ -444,3 +444,97 @@
     - Explanations involving head diversity, optimisation, parameterisation or dataset structure remained hypotheses where their effects had not been separately identified.
 
 - Commit: 8.4 consolidated the completed research evidence
+
+
+
+
+
+# Stage 8 Closing Notes
+
+- Decisions:
+
+    - The completed neural investigation contains five reference models and four attention research questions on MUTAG, PROTEINS and NCI1.
+
+    - The final optimisation evidence consists of 75 reference fits, 45 additional-head fits and 15 Uniform GAT fits, giving 135 distinct fits.
+
+    - Reference reuse remains explicit. The eight-head GAT condition, GAT/GATv2 comparison and learned-attention side of the uniform comparison reuse the corresponding reference records.
+
+    - RQ4 retains the analysis of 15 selected reference GAT states and introduces no additional optimisation fits.
+
+    - The final record groups, selected states and scientific source identities are preserved. No missing core record or inconsistency was identified during the evidence reconciliation.
+
+    - The optional traditional graph-kernel comparison is deferred. No result or claim of superiority over traditional graph methods is included.
+
+    - Numerical presentation will use the preserved unrounded records. Display rounding will not change the values used to calculate means, differences or sample standard deviations.
+
+    - Arithmetic mean accuracy and sample standard deviation across five outer folds remain the principal summaries. Paired accuracy differences are expressed in percentage points.
+
+    - Dataset-specific findings remain separate. The results are not combined into a single ranking across heterogeneous datasets.
+
+    - Uniform retraining and fitted intervention remain distinct experimental conditions. Adaptation during optimisation is available in the former and absent in the latter.
+
+    - Attention concentration, fitted-model sensitivity, explanation faithfulness and real-world causal importance remain separate concepts.
+
+    - Model comparisons retain their actual parameterisation differences. In particular, general-form GATv2 with share_weights=False is not treated as a parameter-matched causal control for dynamic ranking.
+
+    - The common 500-epoch budget retains its development-validation-informed provenance on benchmark graphs later reused for CV.
+
+    - The complete findings remain conditional on the selected datasets, categorical node inputs, connectivity, model adaptations, optimisation procedure and prescribed fold and seed schedule.
+
+- Ideas:
+
+    - A graph-kernel and simple-classifier comparison remains a possible future contextual extension, subject to a sound implementation and prospectively specified selection and assessment procedure.
+
+    - No additional experimental direction was adopted during evidence consolidation.
+
+- Report notes:
+
+    - The 135 final JSON records preserve effective settings, partition indices, training seeds, selection metadata, aligned predictions and labels, parameter counts, runtime information and source commits.
+
+    - Their paired PT files preserve the selected model states. Availability of a state file is distinct from independently reproducing its predictions.
+
+    - experiments/result_validation.py and experiments/summarise.py provide the existing validation and summary path for the reference results and RQ1 through RQ3.
+
+    - results/rq4_fitted_gat_attention.json preserves RQ4 graph-level measurements, fold-level outcomes and dataset summaries. Its numerical presentation can be regenerated from those saved values without repeating attention extraction or model inference.
+
+    - RQ4 covers all 188 MUTAG graphs, 1,113 PROTEINS graphs and 4,110 NCI1 graphs once in their corresponding outer-test folds.
+
+    - Reference fits retain source commit c60bbd57fd1c7cc7e6bce3a4a51c6fdc54b0776f.
+
+    - Additional-head fits retain source commit 59b4777610a56b06fb9dec3c3c2da8b9416791b0.
+
+    - Uniform-attention retraining retains source commit f68e626a88c54c160ea47b1d17d1b9c7e710ec7f.
+
+    - The retained RQ4 analysis identifies source commit f94c44c67f9d02bbaaf99f8f7bf01690f1c7de2c and records the reference-state source separately.
+
+    - RQ1 showed non-monotonic head-count results. Eight heads had the highest observed mean on MUTAG and PROTEINS, while two heads had the highest on NCI1. These observations did not establish a universal optimum.
+
+    - RQ2 GATv2-minus-GAT mean accuracy differences were +2.11, -0.90 and -0.34 percentage points on MUTAG, PROTEINS and NCI1 respectively. Their sample standard deviations were 5.14, 0.78 and 0.93 points.
+
+    - RQ3 learned-minus-uniform mean accuracy differences were -1.59, +0.54 and +1.22 percentage points on MUTAG, PROTEINS and NCI1 respectively. Their sample standard deviations were 1.45, 1.95 and 0.77 points.
+
+    - RQ4 Conv1 mean departures from uniform weighting were 0.0091, 0.0092 and 0.0268 on MUTAG, PROTEINS and NCI1 respectively. Conv2 means were 0.1165, 0.0181 and 0.2822.
+
+    - RQ4 intervention-minus-learned mean accuracy differences were -1.10, -5.75 and -20.32 percentage points on MUTAG, PROTEINS and NCI1 respectively. Their sample standard deviations were 4.86, 8.36 and 1.34 points.
+
+    - The NCI1 retraining difference of +1.22 percentage points and fitted-intervention reduction of 20.32 points illustrate the distinction between learning under a constraint and imposing that constraint on an existing fitted solution.
+
+    - RQ4 changed attention scoring in both layers simultaneously. The larger NCI1 Conv2 departure did not establish that Conv2 alone caused the intervention effect.
+
+    - Graph Attention Networks, published at ICLR 2018, supplies the attention and multi-head formulations in Section 2.1 and the constant-attention control in Section 3.3. That control evaluated node-level predictions on PPI rather than graph-classification targets.
+
+    - How Attentive are Graph Attention Networks?, published at ICLR 2022, supplies the static/dynamic distinction in Sections 3.1 through 3.3. Section 4 and Appendix G.2 distinguish its shared-transform experimental setup from the general parameterisation retained here.
+
+    - A Fair Comparison of Graph Neural Networks for Graph Classification, published at ICLR 2020, motivates separating model selection from assessment. Its ten-fold configuration search and three retrainings differ from this project's fixed-configuration, five-fold, one-fit-per-fold procedure.
+
+    - The final CV estimates are not an untouched external assessment independent of the earlier epoch-budget decision. results/development_epoch_budget_audit.json preserves the development evidence behind that choice.
+
+    - Fold standard deviations include variation under different partitions and their prescribed training realisations. They do not separately estimate initialisation variability, and overlapping fitting sets limit independent-sample interpretations.
+
+    - Potential report assets include dataset and architecture tables, the complete reference comparison, the fixed-width head comparison, the uniform-retraining comparison and the two-component RQ4 summary.
+
+    - RQ2 can use the existing reference comparison rather than duplicating the same results in another full table. Additional figures are useful only where they clarify a pattern beyond the tables.
+
+    - The supported overall conclusion is that attention-design effects depend on the dataset and experimental condition. The evidence does not establish a universally preferable head count, a consistent GATv2 advantage or a universal benefit or dispensability of learned attention.
+
+- Commit: Stage 8 recorded closing decisions and report notes
