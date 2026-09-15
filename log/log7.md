@@ -1363,3 +1363,211 @@
     - The next Stage 7 work is Closing Notes followed by the complete Review 7.
 
 - Commit: 7.5 synthesised the core attention evidence
+
+
+
+
+
+# Stage 7 Closing Notes
+
+- Decisions:
+
+    - The core attention investigation is complete with the four predeclared research questions RQ1 through RQ4.
+
+    - No additional attention intervention, synthetic task, dataset, head-similarity analysis, self-loop-mass study or novelty experiment is required to complete Stage 7.
+
+    - Mixed, negative and dataset-dependent results are retained as findings rather than treated as reasons to alter the questions or run further configurations.
+
+    - RQ1 keeps total first-layer GAT representation width fixed at 64 while varying head count.
+
+    - This means the 1-, 2-, 4- and 8-head configurations use 64, 32, 16 and 8 channels per head respectively.
+
+    - The eight-head condition remains the predetermined reference GAT rather than being replaced by whichever head count achieved the highest observed mean on a particular dataset.
+
+    - RQ2 remains a comparison of the project's standard GAT and standard general-form GATv2 implementations under the same assessment pipeline.
+
+    - GATv2 retains share_weights=False and is therefore not parameter matched to GAT.
+
+    - RQ2 is consequently interpreted as a comparison of the complete chosen model formulations rather than a pure causal estimate of static versus dynamic attention ranking.
+
+    - RQ3 retains the fresh uniform-attention retraining control established before final assessment.
+
+    - Its attention-scoring tensors remain fixed at zero while the remaining message transformations and classifier are trained normally.
+
+    - RQ3 therefore measures performance when the model can adapt throughout optimisation to uniform neighbourhood weighting.
+
+    - RQ4 remains a separate fitted-model intervention rather than another retraining experiment.
+
+    - The 15 validation-selected reference GAT states are reused without optimisation.
+
+    - The intervention changes only conv1.att_src, conv1.att_dst, conv2.att_src and conv2.att_dst by setting them to zero in a copied fitted model.
+
+    - Message transformations, biases, classifier, topology, self loops and head organisation remain those learned by the selected reference state.
+
+    - RQ4 characterises realised attention with one minus normalised entropy, using natural logarithms and excluding receivers with only one effective incoming entry from the entropy calculation.
+
+    - Conv1 entropy is calculated separately for each of its eight heads before the head departures are averaged at receiver level.
+
+    - Receiver values are averaged within graphs and graphs are averaged equally within outer folds.
+
+    - Fold summaries use arithmetic means and sample standard deviations with ddof=1.
+
+    - The final RQ4 execution uses analysis source commit f94c44c67f9d02bbaaf99f8f7bf01690f1c7de2c.
+
+    - The fitted states analysed by RQ4 retain reference source commit c60bbd57fd1c7cc7e6bce3a4a51c6fdc54b0776f.
+
+    - The earlier complete RQ4 execution was deliberately replaced by the final execution after progress reporting was added.
+
+    - The progress-output change did not alter the scientific analysis, and the final execution reproduced the same numerical findings.
+
+    - RQ3 retraining and RQ4 fitted intervention are retained as distinct controls because they answer different questions.
+
+    - A retrained uniform model can compensate through its remaining trainable parameters, whereas the RQ4 fitted intervention receives no opportunity to adapt.
+
+    - Attention concentration is not treated as equivalent to predictive importance.
+
+    - Neither the attention coefficients nor the fitted intervention are interpreted as proof that attention is a faithful explanation method or that particular neighbours are causally important in the underlying domain.
+
+    - No statistical significance, confidence-interval or equivalence claim is made from the five outer folds.
+
+    - Sample standard deviation is retained as a descriptive measure of variation among the observed fold values.
+
+    - The complete Stage 7 findings remain conditional on the fixed feature-access policy, architecture, optimisation settings, cross-validation procedure and three selected datasets.
+
+- Ideas:
+
+    - No additional consequential research direction was adopted at Stage 7 closure.
+
+- Report notes:
+
+    - RQ1 investigated first-layer GAT head count while holding total first-layer width and model parameter count fixed within each dataset.
+
+    - MUTAG mean outer-test accuracies for 1, 2, 4 and 8 heads were 76.51%, 77.07%, 75.48% and 79.23%.
+
+    - PROTEINS means were 73.94%, 73.40%, 73.94% and 74.12%.
+
+    - NCI1 means were 71.31%, 72.51%, 72.09% and 72.31%.
+
+    - The relationship between head count and observed accuracy was non-monotonic and dataset-dependent.
+
+    - Eight heads had the highest observed mean on MUTAG and PROTEINS, while two heads had the highest observed mean on NCI1.
+
+    - PROTEINS showed only a 0.72 percentage-point range between the four observed means.
+
+    - The RQ1 evidence therefore does not support a general claim that increasing head count improves graph-classification accuracy under fixed total width.
+
+    - The RQ1 new fits retain source commit 59b4777610a56b06fb9dec3c3c2da8b9416791b0.
+
+    - The reused eight-head reference fits retain source commit c60bbd57fd1c7cc7e6bce3a4a51c6fdc54b0776f.
+
+    - RQ2 reused the matched GAT and GATv2 reference groups and required no new optimisation.
+
+    - GATv2 minus GAT mean paired accuracy differences were +2.11 percentage points on MUTAG, -0.90 on PROTEINS and -0.34 on NCI1.
+
+    - Their fold-difference sample standard deviations were 5.14, 0.78 and 0.93 percentage points respectively.
+
+    - GATv2 therefore did not provide a consistent predictive advantage across the three datasets.
+
+    - GATv2 also contained substantially more parameters than GAT.
+
+    - Parameter-count differences were +4,672 on MUTAG, +4,416 on PROTEINS and +6,592 on NCI1.
+
+    - RQ2 must therefore not be reported as a capacity-matched causal test of dynamic neighbour ranking.
+
+    - All RQ2 evidence retains reference source commit c60bbd57fd1c7cc7e6bce3a4a51c6fdc54b0776f.
+
+    - RQ3 compared the learned reference GAT with a freshly trained Uniform GAT using the same cross-validation protocol.
+
+    - Learned GAT minus Uniform GAT mean accuracy differences were -1.59 percentage points on MUTAG, +0.54 on PROTEINS and +1.22 on NCI1.
+
+    - Their sample standard deviations were 1.45, 1.95 and 0.77 percentage points respectively.
+
+    - MUTAG therefore had the higher observed mean under uniform retraining.
+
+    - PROTEINS showed a small average difference with mixed fold directions.
+
+    - NCI1 favoured learned attention in all five outer folds.
+
+    - The RQ3 result is therefore dataset-dependent rather than evidence that learned non-uniform attention is universally beneficial or universally unnecessary.
+
+    - Uniform GAT keeps the same total parameter count as learned GAT but freezes 256 attention-scoring parameters.
+
+    - Its trainable parameter counts were 4,802 on MUTAG, 4,546 on PROTEINS and 6,722 on NCI1.
+
+    - The RQ3 new fits retain source commit f68e626a88c54c160ea47b1d17d1b9c7e710ec7f.
+
+    - The reused learned GAT fits retain source commit c60bbd57fd1c7cc7e6bce3a4a51c6fdc54b0776f.
+
+    - RQ4 reused exactly 15 validation-selected reference GAT states and performed zero optimisation fits.
+
+    - The final RQ4 result is stored in results/rq4_fitted_gat_attention.json.
+
+    - Conv1 mean attention departures from uniformity were 0.0091 on MUTAG, 0.0092 on PROTEINS and 0.0268 on NCI1.
+
+    - Their sample standard deviations were 0.0082, 0.0068 and 0.0108 respectively.
+
+    - Conv1 therefore remained close to uniform on average under the predefined graph-equal entropy measure on all three datasets.
+
+    - Conv2 mean departures were 0.1165 on MUTAG, 0.0181 on PROTEINS and 0.2822 on NCI1.
+
+    - Their sample standard deviations were 0.0931, 0.0249 and 0.0750 respectively.
+
+    - Conv2 attention was therefore much more dataset-dependent, with NCI1 showing the strongest and most consistent departure from uniform weighting.
+
+    - MUTAG contained 3,371 eligible receiver occurrences for the entropy calculation and no single-entry receivers.
+
+    - PROTEINS contained 43,466 eligible receivers and 5 single-entry receivers.
+
+    - NCI1 contained 122,319 eligible receivers and 428 single-entry receivers.
+
+    - The fitted uniform-attention intervention changed MUTAG loss by +0.0346 on average, accuracy by -1.10 percentage points and predictions on 10.71% of graphs.
+
+    - The corresponding sample standard deviations were 0.0404 for delta loss, 4.86 percentage points for delta accuracy and 7.45 percentage points for flip rate.
+
+    - MUTAG fold-level accuracy effects had mixed directions.
+
+    - On PROTEINS, mean delta loss was +0.0499, mean delta accuracy was -5.75 percentage points and mean prediction-flip rate was 13.30%.
+
+    - Their sample standard deviations were 0.0621, 8.36 percentage points and 14.31 percentage points respectively.
+
+    - PROTEINS therefore showed meaningful but highly fold-dependent fitted-model sensitivity.
+
+    - On NCI1, mean delta loss was +0.4233, mean delta accuracy was -20.32 percentage points and mean prediction-flip rate was 41.82%.
+
+    - Their sample standard deviations were 0.1443, 1.34 percentage points and 4.28 percentage points respectively.
+
+    - Every NCI1 outer fold had higher loss and lower accuracy after learned attention scoring was removed.
+
+    - NCI1 therefore supplied the clearest descriptive evidence that the fitted reference GAT predictions depended materially on their learned attention scoring.
+
+    - The RQ3 and RQ4 NCI1 results provide an important report distinction.
+
+    - Learned versus uniform retraining differed by only +1.22 percentage points on average, while removing attention scoring from an already fitted learned GAT reduced accuracy by 20.32 percentage points on average.
+
+    - These findings are not contradictory because RQ3 permits adaptation during training and RQ4 does not.
+
+    - A small retraining gap must therefore not be used as evidence that an already fitted learned-attention solution is insensitive to its attention mechanism.
+
+    - NCI1 combined the largest Conv2 departure from uniformity with the largest fitted intervention effect, but this association is descriptive only.
+
+    - RQ4 changes attention scoring in both layers simultaneously and does not isolate Conv2 as the cause of the prediction effect.
+
+    - PROTEINS additionally shows that small average entropy departure can coexist with substantial prediction changes in some folds.
+
+    - Attention entropy should therefore not be treated as a direct quantitative measure of predictive importance.
+
+    - None of the Stage 7 attention measurements establish explanation faithfulness or causal importance of neighbours in the underlying chemical or biological tasks.
+
+    - The Stage 7 comparison pipeline remains conditional on categorical node features and graph connectivity only.
+
+    - Continuous node attributes and edge features remain outside the principal model inputs.
+
+    - The three datasets differ materially in size, graph structure and input dimensionality, so dataset-specific behaviour is retained rather than averaged into one cross-dataset ranking.
+
+    - experiments/summarise.py remains the reproducible source for the reference, RQ1, RQ2 and RQ3 numerical summaries.
+
+    - results/rq4_fitted_gat_attention.json remains the reproducible source for RQ4 graph-level, fold-level and dataset-level evidence.
+
+    - The next scientific task is Review 7, which must teach the full Stage 7 investigation, including interpretation against the original hypotheses, experimental controls, uncertainty, attention-explanation limits and the distinction between retraining and fitted intervention.
+
+- Commit: Stage 7 recorded closing decisions and report notes
