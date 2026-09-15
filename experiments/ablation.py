@@ -9,7 +9,7 @@ from experiments.train_cv import (
 from src.recording import get_result_path
 
 
-variants = [
+head_variants = [
     {
         "name": "GAT heads 1",
         "reuse_reference": False,
@@ -37,6 +37,9 @@ variants = [
             "heads": 4,
         },
     },
+]
+
+variants = head_variants + [
     {
         "name": "GAT heads 8 reference",
         "reuse_reference": True,

@@ -4,6 +4,7 @@ import os
 
 import numpy as np
 
+from experiments.ablation import get_variant_settings, head_variants
 from experiments.train_cv import (
     datasets,
     model_settings,
@@ -59,8 +60,13 @@ def load_group(current_settings, dataset, partitions):
     prefix = (
         f"{result_type}_"
         f"{current_settings['model'].lower()}_"
-        f"{current_settings['dataset'].lower()}_fold"
+        f"{current_settings['dataset'].lower()}"
     )
+
+    if current_settings["variant"] is not None:
+        prefix += f"_{current_settings['variant']}"
+
+    prefix += "_fold"
 
     results = {}
 
@@ -150,7 +156,12 @@ def load_group(current_settings, dataset, partitions):
             for prediction, label in zip(predictions, labels)
         ) / len(labels)
 
-        if not math.isclose(accuracy, outer_test["accuracy"], rel_tol=0, abs_tol=1e-12):
+        if not math.isclose(
+            accuracy,
+            outer_test["accuracy"],
+            rel_tol=0,
+            abs_tol=1e-12,
+        ):
             raise ValueError(f"Stored accuracy disagrees with predictions: {result_path}")
 
         for loss in [selection["validation_loss"], outer_test["loss"]]:
@@ -187,12 +198,103 @@ def load_group(current_settings, dataset, partitions):
     return [results[fold_id] for fold_id in range(settings["num_folds"])]
 
 
+def check_parameter_counts(results, description):
+    if any(
+        result["parameters"] != results[0]["parameters"]
+        for result in results
+    ):
+        raise ValueError(f"Parameter counts differ: {description}")
+
+
+def check_runtime_conditions(results):
+    first_result = results[0]
+
+    for result in results:
+        for name in ["device", "pytorch_version", "pyg_version", "cuda_version"]:
+            if result[name] != first_result[name]:
+                raise ValueError(f"Inconsistent runtime conditions: {name}")
+
+        if result["runtime"]["convention"] != first_result["runtime"]["convention"]:
+            raise ValueError("Inconsistent runtime conventions")
+
+    return first_result
+
+
+def print_accuracy_table(groups, label_name, setting_name):
+    print("Outer-test accuracy (%):")
+
+    fold_columns = " | ".join(
+        f"Outer fold {fold_id}"
+        for fold_id in range(settings["num_folds"])
+    )
+
+    print(
+        f"Dataset | {label_name} | "
+        f"{fold_columns} | Mean | Sample SD"
+    )
+
+    for results in groups:
+        current_settings = results[0]["settings"]
+        accuracies = np.array(
+            [result["outer_test"]["accuracy"] for result in results]
+        ) * 100
+        fold_values = " | ".join(
+            f"{accuracy:.2f}"
+            for accuracy in accuracies
+        )
+
+        print(
+            f"{current_settings['dataset']} | "
+            f"{current_settings[setting_name]} | "
+            f"{fold_values} | "
+            f"{accuracies.mean():.2f} | "
+            f"{accuracies.std(ddof=1):.2f}"
+        )
+
+
+def print_resource_table(groups, label_name, setting_name):
+    print("Parameters and training time:")
+    print("Training passes only; time totals cover all outer folds.")
+    print(
+        f"Dataset | {label_name} | Total parameters | Trainable parameters | "
+        "Total time (s) | Mean epoch time (s)"
+    )
+
+    for results in groups:
+        current_settings = results[0]["settings"]
+        parameters = results[0]["parameters"]
+        training_seconds = sum(
+            result["runtime"]["training_seconds"]
+            for result in results
+        )
+        completed_epochs = sum(
+            result["selection"]["completed_epochs"]
+            for result in results
+        )
+
+        print(
+            f"{current_settings['dataset']} | "
+            f"{current_settings[setting_name]} | "
+            f"{parameters['total']} | "
+            f"{parameters['trainable']} | "
+            f"{training_seconds:.2f} | "
+            f"{training_seconds / completed_epochs:.4f}"
+        )
+
+
 def main():
     groups = []
+    reference_gat_groups = {}
+    dataset_information = {}
 
     for dataset_name in datasets:
         dataset = load_dataset(dataset_name)
         partitions = get_partitions(dataset)
+
+        dataset_information[dataset_name] = {
+            "dataset": dataset,
+            "partitions": partitions,
+        }
 
         for model_name in models:
             current_settings = settings.copy()
@@ -206,21 +308,22 @@ def main():
                 partitions,
             )
 
-            if any(result["parameters"] != results[0]["parameters"] for result in results):
-                raise ValueError(f"Parameter counts differ: {dataset_name}, {model_name}")
+            check_parameter_counts(
+                results,
+                f"{dataset_name}, {model_name}",
+            )
 
             groups.append(results)
 
-    all_results = [result for group in groups for result in group]
-    first_result = all_results[0]
+            if model_name == "GAT":
+                reference_gat_groups[dataset_name] = results
 
-    for result in all_results:
-        for name in ["device", "pytorch_version", "pyg_version", "cuda_version"]:
-            if result[name] != first_result[name]:
-                raise ValueError(f"Inconsistent runtime conditions: {name}")
-
-        if result["runtime"]["convention"] != first_result["runtime"]["convention"]:
-            raise ValueError("Inconsistent runtime conventions")
+    all_results = [
+        result
+        for group in groups
+        for result in group
+    ]
+    first_result = check_runtime_conditions(all_results)
 
     print("Validated reference fits:", len(all_results))
     print("Dataset/model groups:", len(groups))
@@ -231,47 +334,105 @@ def main():
     print("CUDA build:", first_result["cuda_version"])
     print("Source commits:")
 
-    for source_commit in sorted({result["source_commit"] for result in all_results}):
+    for source_commit in sorted(
+        {result["source_commit"] for result in all_results}
+    ):
         print(source_commit)
 
     print()
-    print("Outer-test accuracy (%):")
-    fold_columns = " | ".join(
-        f"Outer fold {fold_id}" for fold_id in range(settings["num_folds"])
+    print_accuracy_table(
+        groups,
+        "Model",
+        "model",
     )
-    print(f"Dataset | Model | {fold_columns} | Mean | Sample SD")
-
-    for results in groups:
-        current_settings = results[0]["settings"]
-        accuracies = np.array(
-            [result["outer_test"]["accuracy"] for result in results]
-        ) * 100
-        fold_values = " | ".join(f"{accuracy:.2f}" for accuracy in accuracies)
-
-        print(
-            f"{current_settings['dataset']} | {current_settings['model']} | "
-            f"{fold_values} | {accuracies.mean():.2f} | {accuracies.std(ddof=1):.2f}"
-        )
 
     print()
-    print("Parameters and training time:")
-    print("Training passes only; time totals cover all outer folds.")
-    print(
-        "Dataset | Model | Total parameters | Trainable parameters | "
-        "Total time (s) | Mean epoch time (s)"
+    print_resource_table(
+        groups,
+        "Model",
+        "model",
     )
 
-    for results in groups:
-        current_settings = results[0]["settings"]
-        parameters = results[0]["parameters"]
-        training_seconds = sum(result["runtime"]["training_seconds"] for result in results)
-        completed_epochs = sum(result["selection"]["completed_epochs"] for result in results)
+    head_groups = []
 
-        print(
-            f"{current_settings['dataset']} | {current_settings['model']} | "
-            f"{parameters['total']} | {parameters['trainable']} | "
-            f"{training_seconds:.2f} | {training_seconds / completed_epochs:.4f}"
+    for dataset_name in datasets:
+        dataset = dataset_information[dataset_name]["dataset"]
+        partitions = dataset_information[dataset_name]["partitions"]
+        dataset_head_groups = []
+
+        for variant in head_variants:
+            current_settings = get_variant_settings(variant)
+            current_settings["dataset"] = dataset_name
+
+            results = load_group(
+                current_settings,
+                dataset,
+                partitions,
+            )
+
+            check_parameter_counts(
+                results,
+                f"{dataset_name}, {variant['name']}",
+            )
+
+            dataset_head_groups.append(results)
+
+        dataset_head_groups.append(
+            reference_gat_groups[dataset_name]
         )
+
+        expected_parameters = dataset_head_groups[0][0]["parameters"]
+
+        if any(
+            results[0]["parameters"] != expected_parameters
+            for results in dataset_head_groups
+        ):
+            raise ValueError(
+                f"Parameter counts differ across head counts: {dataset_name}"
+            )
+
+        head_groups.extend(dataset_head_groups)
+
+    all_head_results = [
+        result
+        for group in head_groups
+        for result in group
+    ]
+    check_runtime_conditions(all_head_results)
+
+    new_fit_count = (
+        len(head_variants)
+        * len(datasets)
+        * settings["num_folds"]
+    )
+
+    print()
+    print("RQ1 fixed-width GAT head count:")
+    print(
+        "Validated fits including reused reference:",
+        len(all_head_results),
+    )
+    print("New fits:", new_fit_count)
+    print("Source commits:")
+
+    for source_commit in sorted(
+        {result["source_commit"] for result in all_head_results}
+    ):
+        print(source_commit)
+
+    print()
+    print_accuracy_table(
+        head_groups,
+        "Heads",
+        "heads",
+    )
+
+    print()
+    print_resource_table(
+        head_groups,
+        "Heads",
+        "heads",
+    )
 
 
 if __name__ == "__main__":
