@@ -127,3 +127,200 @@
     - No additional optimisation, model inference or change to the scientific source was required.
 
 - Commit: 8.1 closed the core result set
+
+
+
+
+
+# 8.2 Research Findings and Source Notes
+
+- Consolidated the completed research questions into a compact evidence and interpretation map.
+
+    - The result groups were those identified in 8.1.
+
+    - Numerical findings were reconciled with the preserved records and the Stage 7 evidence notes.
+
+    - The table distinguishes the observed answer from claims that the comparison cannot establish.
+
+    | Research question | Preserved evidence | Supported answer | Main qualification |
+    | --- | --- | --- | --- |
+    | RQ1: First-layer head count at fixed total width | Reference GAT and heads1, heads2 and heads4 records on all three datasets | Accuracy did not increase monotonically with head count. Eight heads had the highest observed mean on MUTAG and PROTEINS; two heads had the highest on NCI1. | No universally optimal head count was established. Increasing heads also reduced channels per head under the fixed-width design. |
+    | RQ2: Standard GAT versus general-form GATv2 | Matched reference GAT and GATv2 records | GATv2-minus-GAT mean accuracy differences were +2.11, -0.90 and -0.34 percentage points on MUTAG, PROTEINS and NCI1 respectively. | The chosen GATv2 had more parameters. The comparison did not isolate the causal effect of query-dependent ranking. |
+    | RQ3: Learned versus uniform-attention retraining | Reference GAT and uniform records | Learned-minus-uniform mean accuracy differences were -1.59, +0.54 and +1.22 percentage points on MUTAG, PROTEINS and NCI1 respectively. | Both conditions could adapt during training. Small differences did not establish equivalence or fitted-model insensitivity. |
+    | RQ4: Fitted attention and uniform intervention | results/rq4_fitted_gat_attention.json and its 15 selected reference GAT states | Conv1 was close to uniform on average; Conv2 was more dataset-dependent. Intervention-minus-learned mean accuracy differences were -1.10, -5.75 and -20.32 percentage points on MUTAG, PROTEINS and NCI1 respectively. | Both layers were intervened on together. Concentration and prediction sensitivity did not establish explanation faithfulness or domain causality. |
+
+- Retained fold variability alongside the mean paired differences.
+
+    - RQ2 difference sample standard deviations were 5.14, 0.78 and 0.93 percentage points for MUTAG, PROTEINS and NCI1 respectively.
+
+    - RQ3 difference sample standard deviations were 1.45, 1.95 and 0.77 percentage points.
+
+    - RQ4 accuracy-difference sample standard deviations were 4.86, 8.36 and 1.34 percentage points.
+
+    - Every NCI1 fold favoured learned attention over uniform retraining in RQ3.
+
+    - Every NCI1 fold had higher loss and lower accuracy after the fitted intervention in RQ4.
+
+    - Means and sample standard deviations remained descriptive summaries of the five outer folds.
+
+- Preserved both components of RQ4 in the report evidence.
+
+    - Conv1 mean departures from uniform weighting were 0.0091 on MUTAG, 0.0092 on PROTEINS and 0.0268 on NCI1.
+
+    - Conv2 mean departures were 0.1165, 0.0181 and 0.2822 respectively.
+
+    - These were means of the five graph-equal fold summaries, with the layers kept separate.
+
+    - Mean intervention-minus-learned cross-entropy differences were +0.0346, +0.0499 and +0.4233 respectively.
+
+    - Mean prediction-flip rates were 10.71%, 13.30% and 41.82% respectively.
+
+    - Complete fold values, sample standard deviations and receiver counts remained in the saved RQ4 record.
+
+    - Rounded zero departures were not treated as proof of exact uniformity.
+
+- The relationship between RQ3 and RQ4 remained central to the interpretation.
+
+    - On NCI1, learned attention exceeded uniform retraining by 1.22 percentage points on average.
+
+    - Removing learned scoring from the already fitted reference GAT reduced accuracy by 20.32 percentage points on average.
+
+    - Uniform retraining allowed the remaining transformations and classifier to adapt throughout optimisation.
+
+    - The fitted intervention preserved those parameters and provided no opportunity to adapt.
+
+    - The two results therefore described different experimental conditions rather than contradictory estimates of the same effect.
+
+- Revisited Graph Attention Networks by Petar Veličković, Guillem Cucurull, Arantxa Casanova, Adriana Romero, Pietro Liò and Yoshua Bengio.
+
+    - The paper was published at ICLR 2018. The supplied copy was arXiv:1710.10903v3, dated 4 February 2018.
+
+    - Section 2.1, particularly Equations 2 through 6 on pages 3 and 4, defined neighbourhood softmax, weighted aggregation and multi-head concatenation or averaging.
+
+    - Section 3.3 on pages 6 and 7 supplied the eight-head, eight-channel precedent and described the constant-attention control.
+
+    - The constant-attention comparison concerned node-level multi-label prediction on PPI. Processing multiple graphs did not make its target graph classification.
+
+    - RQ3 therefore used an established control idea in the project's graph-classification setting rather than introducing constant attention as a new method.
+
+    - The paper's task-specific activations, regularisation, output layers and stopping procedure were not the complete recipe used by this project.
+
+- Revisited How Attentive are Graph Attention Networks? by Shaked Brody, Uri Alon and Eran Yahav.
+
+    - The paper was published at ICLR 2022. The supplied copy was arXiv:2105.14491v3, dated 31 January 2022.
+
+    - Sections 3.1 through 3.3 on pages 4 and 5 defined static and dynamic attention and established the GAT ranking restriction and GATv2 reformulation.
+
+    - Static ranking applied separately within each head for fixed input representations. It did not imply identical normalised coefficients for every receiver.
+
+    - Section 4's Setup paragraph on page 6 described shared transformations in the main GATv2 experiments.
+
+    - Appendix G.2 and Table 18 on page 26 distinguished the general and experimental parameterisations. Those calculations concerned one layer and one head and omitted biases.
+
+    - The project retained share_weights=False and reported actual complete-model parameter counts.
+
+    - The expressivity result motivated RQ2 but did not guarantee improved graph-classification accuracy under the chosen finite architecture and training procedure.
+
+- Revisited A Fair Comparison of Graph Neural Networks for Graph Classification by Federico Errica, Marco Podda, Davide Bacciu and Alessio Micheli.
+
+    - The paper was published at ICLR 2020. The supplied copy was arXiv:1912.09893v3, dated 17 February 2022.
+
+    - The revised preprint date did not change the conference publication year.
+
+    - Section 3 on page 3 distinguished model selection from model assessment.
+
+    - Section 5's Experimental Setting on page 6 used ten outer folds, an inner 90/10 holdout, configuration search and three retrainings after selection, with validation-based early stopping.
+
+    - Precomputed stratified partitions supported consistent comparisons across models.
+
+    - The project adopted separation of fold-local checkpoint selection and assessment, together with shared partitions, while retaining its own five-fold, fixed-configuration, one-fit-per-fold procedure.
+
+    - The earlier development-validation choice of the common epoch budget remained a separate benchmark-reuse limitation.
+
+- Kept the evidence for RQ4's measurement procedure distinct from the literature motivation.
+
+    - Normalised-entropy departure, receiver eligibility, head averaging, graph-equal aggregation and the simultaneous two-layer intervention were the project's predeclared analysis choices.
+
+    - Their specification was retained in log/log6.md, their implementation in experiments/analyse_fitted_gat.py and their execution and interpretation in log/log7.md.
+
+    - The inspected papers were not presented as having performed this exact analysis or established the resulting project findings.
+
+- Identified the source files needed to explain and reproduce the implemented study.
+
+    - experiments/train_cv.py owned the shared assessment settings, reference model settings, dataset list, fold schedule and cross-validation runner.
+
+    - experiments/ablation.py defined the additional head variants, Uniform GAT and reference reuse.
+
+    - experiments/runners/train_heads.py and experiments/runners/train_uniform.py provided the explicit additional-fit entry points.
+
+    - src/data.py contained dataset loading, seeding and partition construction.
+
+    - src/models contained the five classifier definitions and the shared model factory.
+
+    - src/training.py implemented fitting and validation-selected state restoration.
+
+    - src/evaluation.py produced graph-mean loss, accuracy and aligned predictions and labels.
+
+    - src/recording.py preserved result paths, selected states, runtime and source information.
+
+    - experiments/result_validation.py and experiments/summarise.py supported validation and presentation of the reference and RQ1 through RQ3 evidence.
+
+    - experiments/analyse_fitted_gat.py defined the completed RQ4 computation.
+
+- Retained the selected states and development evidence needed for the methodological account.
+
+    - The 135 paired PT files preserved the selected states for the final optimisation fits.
+
+    - The 15 reference GAT states were the fitted inputs to RQ4.
+
+    - RQ4 preserved its measurements in one JSON file and did not create another set of trained checkpoints.
+
+    - results/development_epoch_budget_audit.json and experiments/inspections/inspect_epoch_budget.py retained the evidence and procedure behind the common 500-epoch decision.
+
+    - The audit record identified source commit 834ca47202de75bd64cd89dd4bec17f36d2ccb70.
+
+    - Final fit and analysis source commits remained those recorded in 8.1 and in the corresponding result files.
+
+    - requirements.txt and the runtime fields in the records retained the package and execution context.
+
+- Identified potential report assets and their evidence sources.
+
+    - A dataset table could use the recorded inspections in log/log1.md and log/log6.md, supported by the current dataset inspectors and loader policy.
+
+    - An architecture and settings table could use the model definitions, effective result settings and recorded methodological provenance.
+
+    - A reference-results table could present all five models and also provide the main RQ2 comparison.
+
+    - A head-count table could present all four configurations at fixed total width. A head-count figure remained optional if it communicated the pattern more clearly.
+
+    - A uniform-retraining table could present the learned and uniform results with their paired differences and trainable parameter counts.
+
+    - An RQ4 table could present both layers' departures together with loss changes, accuracy changes and prediction-flip rates.
+
+    - Complete fold values could support a purposeful appendix without repeating every value in the main text.
+
+    - Numerical assets would be generated from the preserved records. RQ4 tables would read the saved analysis JSON without repeating the fitted-model analysis.
+
+- Inspected the current report skeleton and bibliography.
+
+    - report/main.tex retained the empty agreed section structure.
+
+    - report/references.bib contained the existing kipf2017gcn and velickovic2018gat entries.
+
+    - The verified GAT author order and conference year agreed with the existing entry.
+
+    - GATv2 and Fair Comparison metadata were retained here for bibliography preparation during the report phase.
+
+    - No measured report figures were present in the supplied archive. The assets listed above remained proposed outputs rather than completed figures or tables.
+
+- Consolidated the report evidence boundary.
+
+    - Project records supported numerical and implementation claims.
+
+    - Inspected paper passages supported the theoretical motivation and comparisons with prior methods and evaluation practice.
+
+    - Possible explanations involving head diversity, optimisation, parameterisation and dataset structure remained hypotheses where the experiments had not isolated them.
+
+    - The completed findings supported qualified answers to all four questions while preserving negative, mixed and dataset-dependent results.
+
+- Commit: 8.2 consolidated research findings and source notes
