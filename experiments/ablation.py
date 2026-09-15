@@ -39,6 +39,16 @@ head_variants = [
     },
 ]
 
+uniform_variant = {
+    "name": "Uniform GAT",
+    "reuse_reference": False,
+    "settings": {
+        "model": "GAT",
+        "variant": "uniform",
+        "uniform_attention": True,
+    },
+}
+
 variants = head_variants + [
     {
         "name": "GAT heads 8 reference",
@@ -56,15 +66,7 @@ variants = head_variants + [
             "variant": None,
         },
     },
-    {
-        "name": "Uniform GAT",
-        "reuse_reference": False,
-        "settings": {
-            "model": "GAT",
-            "variant": "uniform",
-            "uniform_attention": True,
-        },
-    },
+    uniform_variant,
 ]
 
 

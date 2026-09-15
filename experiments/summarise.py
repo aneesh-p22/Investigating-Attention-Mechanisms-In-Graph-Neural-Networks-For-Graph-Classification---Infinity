@@ -4,7 +4,11 @@ import os
 
 import numpy as np
 
-from experiments.ablation import get_variant_settings, head_variants
+from experiments.ablation import (
+    get_variant_settings,
+    head_variants,
+    uniform_variant,
+)
 from experiments.train_cv import (
     datasets,
     model_settings,
@@ -283,28 +287,38 @@ def print_resource_table(groups, label_name, setting_name):
 
 
 def get_paired_accuracy_differences(
-    gat_results,
-    gatv2_results,
+    baseline_results,
+    comparison_results,
     dataset_name,
 ):
     differences = []
 
-    for gat_result, gatv2_result in zip(gat_results, gatv2_results):
-        gat_fold = gat_result["settings"]["fold_id"]
-        gatv2_fold = gatv2_result["settings"]["fold_id"]
+    for baseline_result, comparison_result in zip(
+        baseline_results,
+        comparison_results,
+    ):
+        baseline_fold = baseline_result["settings"]["fold_id"]
+        comparison_fold = comparison_result["settings"]["fold_id"]
 
-        if gat_fold != gatv2_fold:
+        if baseline_fold != comparison_fold:
             raise ValueError(f"Unmatched outer folds: {dataset_name}")
 
-        if gat_result["partitions"] != gatv2_result["partitions"]:
-            raise ValueError(f"Unmatched partitions: {dataset_name}, fold {gat_fold}")
+        if baseline_result["partitions"] != comparison_result["partitions"]:
+            raise ValueError(
+                f"Unmatched partitions: {dataset_name}, fold {baseline_fold}"
+            )
 
-        if gat_result["outer_test"]["labels"] != gatv2_result["outer_test"]["labels"]:
-            raise ValueError(f"Unmatched test labels: {dataset_name}, fold {gat_fold}")
+        if (
+            baseline_result["outer_test"]["labels"]
+            != comparison_result["outer_test"]["labels"]
+        ):
+            raise ValueError(
+                f"Unmatched test labels: {dataset_name}, fold {baseline_fold}"
+            )
 
         difference = (
-            gatv2_result["outer_test"]["accuracy"]
-            - gat_result["outer_test"]["accuracy"]
+            comparison_result["outer_test"]["accuracy"]
+            - baseline_result["outer_test"]["accuracy"]
         ) * 100
 
         differences.append(difference)
@@ -382,6 +396,83 @@ def print_gat_gatv2_parameter_comparison(
             f"{gatv2_parameters['total']} | "
             f"{gatv2_parameters['trainable']} | "
             f"{gatv2_parameters['total'] - gat_parameters['total']}"
+        )
+
+
+def print_learned_uniform_accuracy_comparison(
+    reference_gat_groups,
+    uniform_gat_groups,
+):
+    print("Outer-test accuracy comparison:")
+    print("Differences are learned GAT minus Uniform GAT in percentage points.")
+
+    fold_columns = " | ".join(
+        f"Outer fold {fold_id}"
+        for fold_id in range(settings["num_folds"])
+    )
+
+    print(
+        f"Dataset | Learned GAT mean | Uniform GAT mean | "
+        f"{fold_columns} | Mean difference | Sample SD"
+    )
+
+    for dataset_name in datasets:
+        learned_results = reference_gat_groups[dataset_name]
+        uniform_results = uniform_gat_groups[dataset_name]
+
+        learned_accuracies = np.array(
+            [result["outer_test"]["accuracy"] for result in learned_results]
+        ) * 100
+        uniform_accuracies = np.array(
+            [result["outer_test"]["accuracy"] for result in uniform_results]
+        ) * 100
+
+        differences = get_paired_accuracy_differences(
+            uniform_results,
+            learned_results,
+            dataset_name,
+        )
+
+        fold_values = " | ".join(
+            f"{difference:.2f}"
+            for difference in differences
+        )
+
+        print(
+            f"{dataset_name} | "
+            f"{learned_accuracies.mean():.2f} | "
+            f"{uniform_accuracies.mean():.2f} | "
+            f"{fold_values} | "
+            f"{differences.mean():.2f} | "
+            f"{differences.std(ddof=1):.2f}"
+        )
+
+
+def print_learned_uniform_parameter_comparison(
+    reference_gat_groups,
+    uniform_gat_groups,
+):
+    print("Parameter counts:")
+    print(
+        "Dataset | Learned total | Learned trainable | "
+        "Uniform total | Uniform trainable | Uniform frozen"
+    )
+
+    for dataset_name in datasets:
+        learned_parameters = (
+            reference_gat_groups[dataset_name][0]["parameters"]
+        )
+        uniform_parameters = (
+            uniform_gat_groups[dataset_name][0]["parameters"]
+        )
+
+        print(
+            f"{dataset_name} | "
+            f"{learned_parameters['total']} | "
+            f"{learned_parameters['trainable']} | "
+            f"{uniform_parameters['total']} | "
+            f"{uniform_parameters['trainable']} | "
+            f"{uniform_parameters['total'] - uniform_parameters['trainable']}"
         )
 
 
@@ -570,6 +661,79 @@ def main():
     print_gat_gatv2_parameter_comparison(
         reference_gat_groups,
         reference_gatv2_groups,
+    )
+
+    uniform_gat_groups = {}
+    rq3_results = []
+
+    for dataset_name in datasets:
+        dataset = dataset_information[dataset_name]["dataset"]
+        partitions = dataset_information[dataset_name]["partitions"]
+
+        current_settings = get_variant_settings(uniform_variant)
+        current_settings["dataset"] = dataset_name
+
+        uniform_results = load_group(
+            current_settings,
+            dataset,
+            partitions,
+        )
+
+        check_parameter_counts(
+            uniform_results,
+            f"{dataset_name}, {uniform_variant['name']}",
+        )
+
+        learned_results = reference_gat_groups[dataset_name]
+        learned_parameters = learned_results[0]["parameters"]
+        uniform_parameters = uniform_results[0]["parameters"]
+
+        if uniform_parameters["total"] != learned_parameters["total"]:
+            raise ValueError(
+                f"Total parameters differ for uniform control: {dataset_name}"
+            )
+
+        if learned_parameters["trainable"] != learned_parameters["total"]:
+            raise ValueError(
+                f"Reference GAT has frozen parameters: {dataset_name}"
+            )
+
+        if not 0 < uniform_parameters["trainable"] < uniform_parameters["total"]:
+            raise ValueError(
+                f"Uniform GAT does not have frozen parameters: {dataset_name}"
+            )
+
+        uniform_gat_groups[dataset_name] = uniform_results
+
+        rq3_results.extend(learned_results)
+        rq3_results.extend(uniform_results)
+
+    check_runtime_conditions(rq3_results)
+
+    print()
+    print("RQ3 learned versus uniform-attention retraining:")
+    print("Validated fits including reused reference:", len(rq3_results))
+    print(
+        "New fits:",
+        len(datasets) * settings["num_folds"],
+    )
+    print("Source commits:")
+
+    for source_commit in sorted(
+        {result["source_commit"] for result in rq3_results}
+    ):
+        print(source_commit)
+
+    print()
+    print_learned_uniform_accuracy_comparison(
+        reference_gat_groups,
+        uniform_gat_groups,
+    )
+
+    print()
+    print_learned_uniform_parameter_comparison(
+        reference_gat_groups,
+        uniform_gat_groups,
     )
 
 

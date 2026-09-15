@@ -1,7 +1,7 @@
 from experiments.ablation import head_variants, run_variant
 
 
-def main():
+def train_heads():
     print("RQ1 fixed-width GAT head-count fits:")
 
     for variant in head_variants:
@@ -12,4 +12,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    train_heads()
