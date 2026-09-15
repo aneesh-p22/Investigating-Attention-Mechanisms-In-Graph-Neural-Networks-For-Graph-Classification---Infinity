@@ -705,3 +705,347 @@
     - No statistical significance or equivalence claim is made from these results.
 
 - Commit: 7.3 recorded uniform-attention retraining results
+
+
+
+
+
+# 7.4 Fitted Reference-GAT Attention Characterisation and Intervention
+
+- Investigated RQ4 using the 15 validation-selected reference eight-head GAT states from MUTAG, PROTEINS and NCI1.
+
+    - Each dataset contributed all five outer folds.
+
+    - Every analysed graph belonged to the corresponding selected state's outer-test partition.
+
+    - The five-fold rotation therefore analysed every graph out of fold once.
+
+    - No new optimisation fits were performed.
+
+    - The selected reference states retained source commit c60bbd57fd1c7cc7e6bce3a4a51c6fdc54b0776f.
+
+- Separated RQ4 into fitted-attention characterisation and an inference-time uniform-attention intervention.
+
+    - The characterisation measures how far the realised learned attention coefficients depart from uniform neighbourhood weighting.
+
+    - The intervention measures how the same fitted model changes when its learned attention scoring is removed without retraining.
+
+    - This differs from RQ3, where a separate Uniform GAT was trained from scratch and its remaining trainable parameters could adapt to the uniform-attention constraint.
+
+- Used one minus normalised attention entropy as the predefined attention-departure measure.
+
+    - For receiver i, head h and m_i greater than one effective incoming entries, normalised entropy is minus the sum of alpha log alpha divided by log(m_i).
+
+    - Departure from uniformity is one minus this normalised entropy.
+
+    - Perfectly uniform weighting gives departure zero.
+
+    - Larger values indicate more concentrated and less uniform attention distributions.
+
+    - Natural logarithms were used.
+
+- Excluded receivers with only one effective incoming entry from the entropy calculation.
+
+    - For m_i equal to one, log(m_i) is zero and there is no meaningful weighting choice.
+
+    - These receivers were retained as counts rather than silently discarded.
+
+    - MUTAG contained 3,371 eligible receivers and no single-entry receivers across its outer-test graphs.
+
+    - PROTEINS contained 43,466 eligible receivers and 5 single-entry receivers.
+
+    - NCI1 contained 122,319 eligible receivers and 428 single-entry receivers.
+
+- Calculated the first-layer attention measure per head before averaging heads.
+
+    - Conv1 has eight attention heads.
+
+    - Departure was calculated separately for every head of one receiving node.
+
+    - The eight departure values were then averaged to form the receiver-level Conv1 value.
+
+    - Attention coefficients were not averaged across heads before entropy was calculated.
+
+    - Conv2 contains one head and therefore required no head averaging.
+
+- Aggregated the attention measure in the predefined hierarchy.
+
+    - Eligible receiver values were averaged within each graph.
+
+    - Graph values were averaged equally within each outer fold.
+
+    - Conv1 and Conv2 remained separate throughout the analysis.
+
+    - The five fold means for each dataset and layer were summarised with their arithmetic mean and sample standard deviation using ddof=1.
+
+- Reused the cleaned shared result-validation support rather than duplicating cross-validation result checks inside the RQ4 script.
+
+    - experiments/result_validation.py reconstructs the exact expected outer and validation partitions.
+
+    - It opens the exact five expected result paths rather than scanning the result directory.
+
+    - It checks settings, feature policy, partition indices, labels, predictions, recorded accuracy, losses, checkpoint-selection information, paired state paths, parameter counts, runtime information and source-commit consistency.
+
+    - The cleaned experiments/summarise.py reproduced the previously accepted reference, RQ1, RQ2 and RQ3 output exactly before RQ4 was finalised.
+
+    - The obsolete development comparison helper was moved from experiments/compare.py to archive/experiments/compare.py.
+
+- Reconstructed two ordinary reference GATs for each selected state.
+
+    - The exact same selected PT state was loaded into both copies.
+
+    - The learned copy was left untouched.
+
+    - Before intervention, every state tensor in the learned and intervention copies was required to be exactly equal.
+
+    - This avoided introducing a separate intervention-specific GAT architecture.
+
+- Required the untouched reconstructed model to reproduce its saved reference outer-test evaluation.
+
+    - The recomputed ordered labels had to equal the reference JSON labels.
+
+    - The recomputed predictions had to equal the stored predictions.
+
+    - Recomputed accuracy had to agree exactly within the defined numerical tolerance.
+
+    - Recomputed cross-entropy loss had to agree within the defined floating-point tolerance.
+
+    - This connected every analysed selected state directly to its previously validated reference record.
+
+- Implemented the fitted uniform-attention intervention by changing only the four attention-scoring tensors.
+
+    - conv1.att_src was set to zero.
+
+    - conv1.att_dst was set to zero.
+
+    - conv2.att_src was set to zero.
+
+    - conv2.att_dst was set to zero.
+
+    - No optimiser was constructed and no retraining occurred.
+
+    - Every non-attention-scoring state tensor was required to remain exactly equal to the untouched learned model.
+
+    - Zero attention scorers give equal pre-softmax scores and therefore uniform coefficients over each receiver's effective incoming entries.
+
+- Preserved graph-aligned evidence for the intervention.
+
+    - Each saved graph record contains its graph ID and label.
+
+    - It contains the learned prediction and intervention prediction.
+
+    - It contains the Conv1 and Conv2 attention-departure values.
+
+    - It also contains eligible-receiver and single-entry-receiver counts for both layers.
+
+    - Fold records retain their fold ID, selected epoch and paired reference-model state path.
+
+- Used three predefined fitted-intervention endpoints.
+
+    - Delta loss is intervention loss minus learned loss.
+
+    - Positive delta loss therefore means cross-entropy became worse after uniformising attention.
+
+    - Delta accuracy is intervention accuracy minus learned accuracy.
+
+    - Negative delta accuracy therefore means outer-test accuracy fell.
+
+    - Prediction-flip rate is the fraction of held-out graphs whose predicted class changed under the intervention.
+
+    - A model can change cross-entropy without changing its predicted class, so the three endpoints answer related but different questions.
+
+- Added concise progress output before the final RQ4 execution.
+
+    - The script reports the analysis source commit and device before analysis begins.
+
+    - It reports each dataset, outer fold, selected epoch and number of outer-test graphs as the analysis proceeds.
+
+    - This matches the existing project preference for long-running experimental commands to show meaningful execution progress without adding a progress-bar dependency or graph-by-graph output.
+
+- An initial complete RQ4 execution used the same scientific analysis before the progress output was added.
+
+    - That execution produced the same final numerical results.
+
+    - Its result JSON was removed deliberately before the final rerun because the retained evidence should identify the exact final analysis source.
+
+    - No reference model states or earlier experimental results were removed.
+
+    - The progress-output change did not alter the scientific calculations.
+
+- Committed the final RQ4 analysis source before the retained execution.
+
+    - The final analysis source commit was f94c44c67f9d02bbaaf99f8f7bf01690f1c7de2c.
+
+    - The reused reference states retained source commit c60bbd57fd1c7cc7e6bce3a4a51c6fdc54b0776f.
+
+    - The working analysis therefore records separately the code that produced the reference fitted states and the code that analysed those states.
+
+- Ran python -m experiments.analyse_fitted_gat for the final retained RQ4 evidence.
+
+    - The command processed all 15 selected reference states.
+
+    - MUTAG outer-test fold sizes were 38, 38, 38, 37 and 37 graphs, totalling all 188 graphs.
+
+    - PROTEINS fold sizes were 223, 223, 223, 222 and 222, totalling all 1,113 graphs.
+
+    - NCI1 used 822 test graphs in every fold, totalling all 4,110 graphs.
+
+    - No optimisation fits were performed.
+
+    - The analysis returned normally to PowerShell and saved results/rq4_fitted_gat_attention.json.
+
+- The selected reference epochs were preserved and displayed during execution.
+
+    - MUTAG selected epochs were 457, 439, 204, 475 and 16 for outer folds 0 through 4.
+
+    - PROTEINS selected epochs were 187, 6, 5, 86 and 10.
+
+    - NCI1 selected epochs were 256, 335, 178, 279 and 357.
+
+    - These were the existing validation-selected reference states rather than newly selected RQ4 checkpoints.
+
+- Conv1 attention was close to uniform on average on all three datasets.
+
+    - MUTAG fold departures were 0.0122, 0.0074, 0.0020, 0.0217 and 0.0021.
+
+    - MUTAG Conv1 mean departure was 0.0091 with sample SD 0.0082.
+
+    - PROTEINS fold departures were 0.0198, 0.0045, 0.0032, 0.0119 and 0.0064.
+
+    - PROTEINS Conv1 mean was 0.0092 with sample SD 0.0068.
+
+    - NCI1 fold departures were 0.0119, 0.0359, 0.0355, 0.0315 and 0.0190.
+
+    - NCI1 Conv1 mean was 0.0268 with sample SD 0.0108.
+
+    - The first layer therefore showed only weak average departure from uniform weighting under this aggregate measure.
+
+- Conv2 attention was much more dataset-dependent.
+
+    - MUTAG fold departures were 0.0654, 0.1808, 0.2481, 0.0366 and 0.0518.
+
+    - MUTAG Conv2 mean was 0.1165 with sample SD 0.0931.
+
+    - PROTEINS fold departures were 0.0408, 0.0000, 0.0000, 0.0495 and 0.0000 at four-decimal reporting precision.
+
+    - PROTEINS Conv2 mean was 0.0181 with sample SD 0.0249.
+
+    - NCI1 fold departures were 0.3198, 0.3015, 0.2017, 0.3774 and 0.2105.
+
+    - NCI1 Conv2 mean was 0.2822 with sample SD 0.0750.
+
+    - NCI1 therefore showed the strongest and most consistently non-uniform second-layer attention among the three datasets.
+
+- MUTAG showed modest and mixed sensitivity to the fitted uniform-attention intervention.
+
+    - Delta-loss folds were -0.0037, 0.0012, 0.0424, 0.0970 and 0.0362.
+
+    - Mean delta loss was 0.0346 with sample SD 0.0404.
+
+    - Delta-accuracy folds were +5.26, 0.00, -2.63, 0.00 and -8.11 percentage points.
+
+    - Mean delta accuracy was -1.10 percentage points with sample SD 4.86 points.
+
+    - Prediction-flip rates were 10.53%, 5.26%, 2.63%, 21.62% and 13.51%.
+
+    - Mean flip rate was 10.71% with sample SD 7.45%.
+
+    - Predictions were therefore not invariant to the intervention, but its effect on accuracy had no consistent fold direction.
+
+- PROTEINS showed stronger but highly variable fitted-model sensitivity.
+
+    - Delta-loss folds were 0.1311, 0.0049, 0.0047, 0.1029 and 0.0059.
+
+    - Delta loss was positive in all five folds.
+
+    - Mean delta loss was 0.0499 with sample SD 0.0621.
+
+    - Delta-accuracy folds were -17.94, -1.79, +1.79, -10.81 and 0.00 percentage points.
+
+    - Mean delta accuracy was -5.75 percentage points with sample SD 8.36 points.
+
+    - Prediction-flip rates were 34.08%, 4.48%, 2.69%, 22.52% and 2.70%.
+
+    - Mean flip rate was 13.30% with sample SD 14.31%.
+
+    - The classification effect therefore varied substantially between folds even though intervention loss worsened in every fold.
+
+- NCI1 showed the clearest and most consistent fitted-model sensitivity.
+
+    - Delta-loss folds were 0.3345, 0.6011, 0.3192, 0.5590 and 0.3025.
+
+    - Every fold therefore had higher cross-entropy after the intervention.
+
+    - Mean delta loss was 0.4233 with sample SD 0.1443.
+
+    - Delta-accuracy folds were -18.49, -21.90, -19.46, -20.92 and -20.80 percentage points.
+
+    - Every fold therefore had lower accuracy after learned attention scoring was removed.
+
+    - Mean delta accuracy was -20.32 percentage points with sample SD only 1.34 points.
+
+    - Prediction-flip rates were 37.47%, 44.53%, 41.12%, 47.69% and 38.32%.
+
+    - Mean flip rate was 41.82% with sample SD 4.28%.
+
+    - These results provide strong descriptive evidence that the fitted NCI1 GAT predictions depended materially on their learned attention scoring.
+
+- RQ4 therefore produced a layer-dependent and dataset-dependent answer.
+
+    - First-layer attention remained close to uniform on average across all three datasets.
+
+    - Second-layer attention was moderately non-uniform on MUTAG, close to uniform on PROTEINS and substantially non-uniform on NCI1.
+
+    - Removing learned attention scoring produced modest mixed accuracy effects on MUTAG, variable effects on PROTEINS and a large consistent degradation on NCI1.
+
+    - Learned attention weighting was therefore neither universally essential nor universally dispensable under the fitted-model intervention.
+
+- RQ3 and RQ4 gave importantly different evidence because retraining and fitted intervention answer different questions.
+
+    - RQ3 allowed all remaining trainable parameters of the Uniform GAT to adapt during 500 training epochs.
+
+    - RQ4 removed attention scoring only after an ordinary learned-attention GAT had already been fitted.
+
+    - On NCI1, RQ3 found only a 1.22 percentage-point mean advantage for learned-attention retraining, while RQ4 reduced fitted-model accuracy by 20.32 percentage points on average.
+
+    - On PROTEINS, the RQ3 learned-minus-uniform retraining difference was only 0.54 points, while the fitted intervention changed accuracy by -5.75 points on average.
+
+    - On MUTAG, the retrained uniform model had the higher RQ3 mean by 1.59 points, while the fitted intervention produced a smaller and mixed -1.10-point mean change.
+
+    - The results therefore show why a small retraining difference cannot be interpreted as evidence that an already fitted learned-attention model is insensitive to its attention mechanism.
+
+- The observed concentration values were not interpreted as direct measures of predictive importance.
+
+    - NCI1 combined the largest Conv2 departure with the largest fitted intervention effect.
+
+    - PROTEINS showed that relatively small average attention departure can still coexist with substantial prediction changes in some folds.
+
+    - The intervention changes attention scoring in both layers simultaneously.
+
+    - The study therefore cannot attribute the prediction effects specifically to Conv1, Conv2 or to the magnitude of the entropy measure.
+
+- The RQ4 evidence does not establish attention as a faithful explanation method.
+
+    - Attention departure describes realised neighbourhood-weight concentration.
+
+    - Intervention sensitivity describes how the fitted model's predictions respond when that learned weighting is removed.
+
+    - Neither quantity proves that high-attention neighbours are causally important in the underlying molecular or protein domain.
+
+    - No claim of statistical significance or equivalence is made from the five folds.
+
+    - Sample SD describes variation among the five observed fold values and is not a confidence interval.
+
+- The planned RQ4 scope is complete.
+
+    - No head-similarity catalogue was added.
+
+    - No self-loop-mass analysis was added.
+
+    - No random perturbation control was added.
+
+    - No additional fitted intervention was selected after observing these outcomes.
+
+    - The saved JSON retains the graph-level evidence needed to reconstruct the reported fold and dataset summaries.
+
+- Commit: 7.4 analysed fitted reference-GAT attention and uniform intervention
