@@ -374,3 +374,73 @@
     - Treat the existing neural findings as prior information rather than claiming that a subsequently designed comparison was specified independently of them.
 
 - Commit: 8.3 deferred the optional traditional baseline
+
+
+
+
+
+# 8.4 Research Evidence Consolidation
+
+- Established the completed experimental scope.
+
+    - The reference comparison covered GCN, GraphSAGE, GIN, GAT and GATv2 on MUTAG, PROTEINS and NCI1.
+
+    - Each configuration used five outer folds with one fresh fit per fold.
+
+    - The attention investigation covered fixed-width head count, standard GAT versus general-form GATv2, uniform-attention retraining and fitted-attention characterisation with a uniform intervention.
+
+    - The complete evidence comprised 135 optimisation fits and the analysis of 15 selected reference GAT states.
+
+    - The optional traditional graph-kernel comparison remained unperformed.
+
+- Retained a traceable relationship between experimental settings, fitted states, predictions and summaries.
+
+    - Each final fit's JSON record identified its effective settings, partitions, training seed, selected epoch, predictions, labels and scientific source commit.
+
+    - The paired PT file preserved the selected model state.
+
+    - experiments/result_validation.py and experiments/summarise.py supplied the existing validation and summary path for the reference results and RQ1 through RQ3.
+
+    - results/rq4_fitted_gat_attention.json retained graph-level measurements, fold-level results and dataset summaries linked to the selected reference GAT states.
+
+    - Final numerical presentation could therefore be generated from the preserved measurements without fitting additional models.
+
+- Preserved the relationship between the research questions and their supported conclusions.
+
+    - The fixed-width head study showed dataset-dependent, non-monotonic accuracy patterns.
+
+    - General-form GATv2 did not consistently outperform GAT across the three datasets.
+
+    - Learning attention during training did not provide a uniform benefit over the separately retrained uniform control.
+
+    - Fitted-model sensitivity to removing learned scoring varied substantially across datasets, with the largest and most consistent accuracy reduction on NCI1.
+
+    - The retraining and fitted-intervention results remained distinct because only retraining allowed the remaining parameters to adapt to uniform weighting.
+
+- Retained the limits of those conclusions.
+
+    - The findings concerned the chosen categorical node inputs, connectivity, two-layer model adaptations and fixed training procedure.
+
+    - The earlier development-validation choice of the epoch budget limited claims of assessment independence on the reused benchmarks.
+
+    - Five-fold sample standard deviation described observed variation rather than confidence, statistical significance or equivalence.
+
+    - GATv2's different parameterisation prevented interpreting RQ2 as a pure causal estimate of dynamic ranking.
+
+    - The simultaneous intervention on both GAT layers did not isolate the contribution of either layer.
+
+    - Attention departure and prediction sensitivity did not establish explanation faithfulness or real-world causal importance.
+
+    - The neural comparisons did not establish superiority over untested traditional graph methods.
+
+- Preserved the distinction between measurements, theoretical results and possible explanations.
+
+    - Numerical findings were supported by the saved experimental records.
+
+    - The attention mechanisms and static-ranking distinction were supported by their mathematical formulations and the inspected primary literature.
+
+    - The actual architecture, feature policy, selection procedure and intervention were established by the implemented source and recorded settings.
+
+    - Explanations involving head diversity, optimisation, parameterisation or dataset structure remained hypotheses where their effects had not been separately identified.
+
+- Commit: 8.4 consolidated the completed research evidence
