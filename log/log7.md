@@ -473,3 +473,235 @@
     - The parameter-count difference also means the observed accuracy differences cannot be attributed solely to static versus dynamic attention in isolation.
 
 - Commit: 7.2 analysed the matched GAT and GATv2 results
+
+
+
+
+
+# 7.3 Uniform-Attention Retraining
+
+- Investigated RQ3 by comparing the fitted reference GAT with fresh GAT models trained under the established uniform-attention constraint.
+
+    - The learned GAT results were reused from the completed reference cross-validation experiment.
+
+    - One fresh Uniform GAT was trained for each of the five outer folds on MUTAG, PROTEINS and NCI1.
+
+    - This produced 15 new fits.
+
+    - Together with the 15 reused learned-GAT fits, the final RQ3 comparison contained 30 validated result records.
+
+- Kept the established reference architecture and assessment protocol while changing whether the attention-scoring mechanism could learn non-uniform coefficients.
+
+    - Both models retained hidden width 64.
+
+    - Both used eight first-layer heads with eight channels per head and one 64-channel second-layer head.
+
+    - Both retained the same message transformations, biases, ReLU activations, self-loop handling, global sum readout and linear graph classifier.
+
+    - Both used the same datasets, feature policy, folds, validation partitions, training seeds, optimiser settings, batch size, 500-epoch training allowance and validation-loss checkpoint-selection rule.
+
+    - Uniform GAT additionally fixed uniform_attention=True.
+
+- Retained the uniform-attention implementation established before final assessment.
+
+    - conv1.att_src, conv1.att_dst, conv2.att_src and conv2.att_dst are set to zero for a fresh Uniform GAT.
+
+    - Their requires_grad flags are False before the optimiser is created.
+
+    - Equal attention logits therefore produce equal softmax coefficients over the eligible incoming entries for each receiver and head.
+
+    - The message transformations, biases and classifier remain trainable.
+
+    - The graph connectivity and inserted self-loops remain part of message passing.
+
+- Reused the existing integrated Uniform GAT inspection before starting the final RQ3 fits.
+
+    - The MUTAG control model contained 5,058 total parameters and 4,802 trainable parameters.
+
+    - Exactly 256 parameters were frozen.
+
+    - The four attention-scoring tensors were all zero and non-trainable.
+
+    - For the inspected receiving node with three incoming entries, every first-layer head assigned coefficient 0.3333 to each entry.
+
+    - The second layer also assigned coefficient 0.3333 to each of the three entries.
+
+    - Incoming coefficients summed to one in every inspected head.
+
+    - After one optimiser update, all four scoring tensors remained unchanged and zero.
+
+    - The first message transformation and classifier changed, confirming that the remaining model still learned.
+
+- Grouped the small experiment-specific training entry points under experiments/runners.
+
+    - experiments/train_heads.py was moved to experiments/runners/train_heads.py.
+
+    - experiments/runners/train_uniform.py was added for the RQ3 execution.
+
+    - An empty experiments/runners/__init__.py makes the directory an explicit package.
+
+    - The runner functions were named train_heads and train_uniform rather than using generic main names.
+
+    - experiments/train_cv.py remained at the top level because it owns the reusable cross-validation procedure rather than selecting one particular experiment.
+
+- Kept the Uniform GAT definition in experiments/ablation.py rather than duplicating its settings in the new runner.
+
+    - The existing Uniform GAT dictionary was assigned the name uniform_variant.
+
+    - train_uniform imports this variant and passes it to the established run_variant function.
+
+    - run_variant continues to reuse run_cross_validation, so RQ3 does not introduce a second training implementation.
+
+- Created the pre-fit source commit before final RQ3 optimisation.
+
+    - The committed source revision was f68e626a88c54c160ea47b1d17d1b9c7e710ec7f.
+
+    - The new Uniform GAT records were therefore produced from a fixed source state.
+
+    - The reused learned GAT reference records retain their original source revision c60bbd57fd1c7cc7e6bce3a4a51c6fdc54b0776f.
+
+    - The two source hashes are intentionally different because the learned reference fits and later Uniform GAT fits were executed from different committed source states.
+
+- Ran python -m experiments.runners.train_uniform for the final RQ3 experiment.
+
+    - All five MUTAG folds completed.
+
+    - All five PROTEINS folds completed.
+
+    - All five NCI1 folds completed.
+
+    - Each fit completed the full 500-epoch training allowance.
+
+    - Each fit restored the state with minimum validation cross-entropy under the established earliest-exact-tie rule before outer-test assessment.
+
+    - A paired PT model state and JSON result record was saved for every new fold.
+
+    - The execution returned normally to PowerShell after NCI1 outer fold 4.
+
+- Extended experiments/summarise.py to validate and compare the new Uniform GAT evidence.
+
+    - Uniform result groups are loaded using the same settings, filename, state-file, dataset-policy, partition, prediction, loss, parameter and runtime checks used for the reference and earlier ablation results.
+
+    - The Uniform GAT group for each dataset is paired with the existing reference GAT group.
+
+    - Pairing checks require matching outer-fold IDs, partition dictionaries and ordered outer-test labels.
+
+    - This ensures that each reported accuracy difference compares the two models on the same held-out graphs.
+
+    - RQ3 differences are reported as learned GAT accuracy minus Uniform GAT accuracy in percentage points.
+
+    - Positive values therefore favour learned attention and negative values favour Uniform GAT.
+
+- Added explicit parameter-control checks for RQ3.
+
+    - Learned and Uniform GAT must have the same total registered parameter count within each dataset.
+
+    - The reference learned GAT must have all registered parameters trainable.
+
+    - Uniform GAT must have fewer trainable parameters than total parameters because its attention-scoring tensors are frozen.
+
+    - These checks passed for all three datasets.
+
+- Ran python -m experiments.summarise after all 15 Uniform GAT fits were complete.
+
+    - The existing reference section again validated 75 fits.
+
+    - RQ1 again validated 60 contributing fits.
+
+    - RQ2 again validated 30 reused fits.
+
+    - RQ3 validated 30 contributing fits, consisting of 15 reused learned-GAT references and 15 new Uniform GAT fits.
+
+    - The RQ3 source revisions were the expected learned-reference and Uniform-GAT commits.
+
+- MUTAG favoured Uniform GAT in the observed outer-test results.
+
+    - Learned GAT mean accuracy was 79.23%.
+
+    - Uniform GAT mean accuracy was 80.83%.
+
+    - The learned-minus-uniform fold differences were -2.63, -2.63, 0.00, -2.70 and 0.00 percentage points.
+
+    - Their mean was -1.59 percentage points.
+
+    - Their sample standard deviation was 1.45 percentage points.
+
+    - Uniform GAT had higher accuracy on three folds and tied learned GAT on two.
+
+    - The MUTAG evidence therefore does not indicate a performance benefit from learning non-uniform attention coefficients under this protocol.
+
+- PROTEINS produced a small and fold-dependent observed advantage for learned GAT.
+
+    - Learned GAT mean accuracy was 74.12%.
+
+    - Uniform GAT mean accuracy was 73.58%.
+
+    - The learned-minus-uniform fold differences were +0.45, +0.45, -1.79, +3.60 and 0.00 percentage points.
+
+    - Their mean was +0.54 percentage points.
+
+    - Their sample standard deviation was 1.95 percentage points.
+
+    - Two folds favoured learned GAT, one favoured Uniform GAT, one was tied and one showed a larger learned-GAT advantage.
+
+    - The direction was therefore mixed rather than consistently favouring learned attention.
+
+- NCI1 showed the clearest observed advantage for learned non-uniform attention.
+
+    - Learned GAT mean accuracy was 72.31%.
+
+    - Uniform GAT mean accuracy was 71.09%.
+
+    - The learned-minus-uniform fold differences were +0.36, +0.61, +1.95, +1.09 and +2.07 percentage points.
+
+    - Their mean was +1.22 percentage points.
+
+    - Their sample standard deviation was 0.77 percentage points.
+
+    - All five outer folds favoured learned GAT.
+
+    - This provides the most consistent RQ3 evidence that learned non-uniform weighting was useful on one of the adopted datasets.
+
+- Total parameter counts were preserved between the two variants while the intended scoring parameters were removed from optimisation in Uniform GAT.
+
+    - MUTAG contained 5,058 total parameters in both variants, with 5,058 trainable in learned GAT and 4,802 trainable in Uniform GAT.
+
+    - PROTEINS contained 4,802 total parameters in both variants, with 4,802 trainable in learned GAT and 4,546 trainable in Uniform GAT.
+
+    - NCI1 contained 6,978 total parameters in both variants, with 6,978 trainable in learned GAT and 6,722 trainable in Uniform GAT.
+
+    - Uniform GAT therefore froze exactly 256 scoring parameters on every dataset.
+
+    - The comparison deliberately does not equalise the number of trainable parameters because removing learnable attention scoring is the experimental constraint being studied.
+
+- RQ3 does not support a universal claim that learning non-uniform neighbourhood coefficients improves graph-classification accuracy.
+
+    - Uniform retraining achieved the higher observed mean on MUTAG.
+
+    - PROTEINS showed a small mean advantage for learned attention with mixed fold directions.
+
+    - NCI1 showed a modest learned-attention advantage consistently across all five folds.
+
+    - The value of learning unequal attention coefficients was therefore dataset-dependent in this experiment.
+
+- Kept the RQ3 inference boundary distinct from the upcoming fitted-model intervention.
+
+    - RQ3 compares separately trained models that can adapt all parameters permitted by their respective constraints.
+
+    - A Uniform GAT can therefore learn transformations and classifier parameters that compensate for its fixed neighbourhood weighting.
+
+    - RQ3 does not directly establish how dependent an already fitted learned-attention GAT is on the particular non-uniform coefficients it learned.
+
+    - Stage 7.4 addresses that different question by intervening on the preserved selected reference-GAT states without retraining their remaining parameters.
+
+- The RQ3 evidence remains descriptive.
+
+    - The five paired observations per dataset are established outer folds rather than repeated independent training seeds on one fixed split.
+
+    - Outer-fold fitting sets overlap.
+
+    - Sample standard deviation describes observed fold variation and is not a confidence interval or significance test.
+
+    - No statistical significance or equivalence claim is made from these results.
+
+- Commit: 7.3 recorded uniform-attention retraining results
