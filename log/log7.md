@@ -299,3 +299,177 @@
     - Stage 7.1 is therefore an analysis of head-count behaviour rather than another hyperparameter-selection stage.
 
 - Commit: 7.1 recorded the fixed-width attention-head study
+
+
+
+
+
+# 7.2 Matched GAT and GATv2 Comparison
+
+- Investigated RQ2 by comparing the existing reference GAT and GATv2 results under the common Stage 6 assessment pipeline.
+
+    - No new model fitting was required.
+
+    - The comparison reused the five reference GAT folds and five reference GATv2 folds for MUTAG, PROTEINS and NCI1.
+
+    - This gave 30 reused fits in total.
+
+    - All contributing records retained source commit c60bbd57fd1c7cc7e6bce3a4a51c6fdc54b0776f from the original reference execution.
+
+- The comparison retained the common project settings while preserving the intended architectural difference between standard GAT and standard general-form GATv2.
+
+    - Both models used hidden width 64 and eight first-layer attention heads.
+
+    - Both used one 64-channel second-layer head, ReLU, global sum pooling and the final linear classifier.
+
+    - They also shared the same datasets, feature policy, outer folds, validation split schedule, training seed schedule, optimiser settings, batch size, 500-epoch allowance and checkpoint-selection procedure.
+
+    - GATv2 retained share_weights=False.
+
+    - Parameter counts were therefore not artificially forced to match.
+
+- Extended experiments/summarise.py to retain both validated reference GAT and GATv2 groups.
+
+    - reference_gat_groups stores the five accepted GAT folds for each dataset.
+
+    - reference_gatv2_groups stores the corresponding five accepted GATv2 folds.
+
+    - These records had already passed the established settings, partition, prediction, state-file, parameter and runtime checks before entering the RQ2 comparison.
+
+- Added a matched fold comparison rather than comparing only the two overall means.
+
+    - get_paired_accuracy_differences pairs the GAT and GATv2 result with the same outer-fold ID.
+
+    - It checks that paired records contain the same saved partition dictionary.
+
+    - It also checks that their ordered outer-test labels agree.
+
+    - This confirms that each accuracy difference compares predictions on the same held-out graphs.
+
+    - The difference for one fold is calculated as GATv2 outer-test accuracy minus GAT outer-test accuracy and expressed in percentage points.
+
+    - A positive value therefore favours GATv2 and a negative value favours GAT.
+
+- Added print_gat_gatv2_accuracy_comparison to display the matched RQ2 evidence.
+
+    - The table reports the GAT and GATv2 mean accuracies for each dataset.
+
+    - It then reports all five matched outer-fold accuracy differences.
+
+    - Their arithmetic mean gives the average paired difference.
+
+    - Their sample standard deviation describes variation among the five observed fold differences.
+
+    - These paired differences retain information that would be hidden by comparing only the two model means.
+
+- Added a separate parameter-count comparison.
+
+    - This reports the total and trainable parameter counts of GAT and GATv2 for each dataset.
+
+    - It also reports the difference GATv2 minus GAT.
+
+    - The comparison records the actual capacity difference introduced by the chosen standard general-form GATv2 configuration rather than treating the models as parameter matched.
+
+- Ran python -m experiments.summarise after adding the RQ2 section.
+
+    - The existing reference section again validated all 75 reference fits.
+
+    - The RQ1 section again validated its 60 contributing fits.
+
+    - The new RQ2 section validated 30 reused reference fits.
+
+    - The new-fit count was correctly reported as 0.
+
+    - The command returned to PowerShell without a reported error.
+
+- MUTAG was the only dataset on which GATv2 had the higher observed mean.
+
+    - GAT mean outer-test accuracy was 79.23%.
+
+    - GATv2 mean outer-test accuracy was 81.34%.
+
+    - The matched fold differences were +7.89, 0.00, +2.63, -5.41 and +5.41 percentage points.
+
+    - Their mean was +2.11 percentage points.
+
+    - Their sample standard deviation was 5.14 percentage points.
+
+    - GATv2 therefore performed better on average on MUTAG, but the direction and size of the difference varied substantially between outer folds.
+
+- PROTEINS favoured GAT on average.
+
+    - GAT mean outer-test accuracy was 74.12%.
+
+    - GATv2 mean outer-test accuracy was 73.22%.
+
+    - The matched fold differences were -1.35, +0.45, -0.90, -1.35 and -1.35 percentage points.
+
+    - Their mean was -0.90 percentage points.
+
+    - Their sample standard deviation was 0.78 percentage points.
+
+    - Four of the five folds favoured GAT, while one slightly favoured GATv2.
+
+- NCI1 also favoured GAT on average, although the observed mean difference was small.
+
+    - GAT mean outer-test accuracy was 72.31%.
+
+    - GATv2 mean outer-test accuracy was 71.97%.
+
+    - The matched fold differences were +0.85, 0.00, -0.61, -1.70 and -0.24 percentage points.
+
+    - Their mean was -0.34 percentage points.
+
+    - Their sample standard deviation was 0.93 percentage points.
+
+    - The fold-level direction was therefore mixed and the overall observed separation was small.
+
+- GATv2 contained substantially more parameters than GAT under the chosen general-form configuration.
+
+    - On MUTAG, GAT contained 5,058 parameters and GATv2 contained 9,730, a difference of 4,672.
+
+    - On PROTEINS, GAT contained 4,802 parameters and GATv2 contained 9,218, a difference of 4,416.
+
+    - On NCI1, GAT contained 6,978 parameters and GATv2 contained 13,570, a difference of 6,592.
+
+    - All recorded parameters were trainable.
+
+    - The comparison is therefore between the standard project GAT and standard general-form GATv2 rather than two parameter-matched architectures.
+
+- Interpreted the results in relation to the static and dynamic attention distinction studied in Stage 5.
+
+    - Standard GAT has the static-ranking restriction within each attention head.
+
+    - GATv2 changes the scoring formulation so that receiver-dependent sender rankings can be represented.
+
+    - This gives GATv2 a more expressive attention mechanism.
+
+    - Greater attention expressivity does not guarantee better graph-classification accuracy on every dataset.
+
+    - A dataset may not require the additional receiver-dependent ranking capability, and additional model flexibility can interact with optimisation and generalisation rather than producing an automatic improvement.
+
+- RQ2 did not show a consistent accuracy advantage for GATv2.
+
+    - GATv2 had the higher observed mean on MUTAG.
+
+    - GAT had the higher observed mean on PROTEINS and NCI1.
+
+    - The MUTAG advantage also varied considerably across outer folds.
+
+    - The results therefore do not support a general claim that replacing standard GAT attention with the more expressive GATv2 mechanism improves graph-classification performance under this pipeline.
+
+    - They instead show dataset-dependent behaviour despite the theoretical expressivity advantage of dynamic attention.
+
+- The RQ2 conclusion remains descriptive.
+
+    - The five differences come from the five established outer folds rather than repeated training seeds on one fixed partition.
+
+    - Their sample standard deviation is not a confidence interval.
+
+    - The fitting sets overlap across outer folds.
+
+    - No statistical significance or equivalence claim is made.
+
+    - The parameter-count difference also means the observed accuracy differences cannot be attributed solely to static versus dynamic attention in isolation.
+
+- Commit: 7.2 analysed the matched GAT and GATv2 results

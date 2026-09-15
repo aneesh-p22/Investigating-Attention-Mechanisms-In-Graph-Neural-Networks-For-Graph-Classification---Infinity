@@ -282,9 +282,113 @@ def print_resource_table(groups, label_name, setting_name):
         )
 
 
+def get_paired_accuracy_differences(
+    gat_results,
+    gatv2_results,
+    dataset_name,
+):
+    differences = []
+
+    for gat_result, gatv2_result in zip(gat_results, gatv2_results):
+        gat_fold = gat_result["settings"]["fold_id"]
+        gatv2_fold = gatv2_result["settings"]["fold_id"]
+
+        if gat_fold != gatv2_fold:
+            raise ValueError(f"Unmatched outer folds: {dataset_name}")
+
+        if gat_result["partitions"] != gatv2_result["partitions"]:
+            raise ValueError(f"Unmatched partitions: {dataset_name}, fold {gat_fold}")
+
+        if gat_result["outer_test"]["labels"] != gatv2_result["outer_test"]["labels"]:
+            raise ValueError(f"Unmatched test labels: {dataset_name}, fold {gat_fold}")
+
+        difference = (
+            gatv2_result["outer_test"]["accuracy"]
+            - gat_result["outer_test"]["accuracy"]
+        ) * 100
+
+        differences.append(difference)
+
+    return np.array(differences)
+
+
+def print_gat_gatv2_accuracy_comparison(
+    reference_gat_groups,
+    reference_gatv2_groups,
+):
+    print("Outer-test accuracy comparison:")
+    print("Differences are GATv2 minus GAT in percentage points.")
+
+    fold_columns = " | ".join(
+        f"Outer fold {fold_id}"
+        for fold_id in range(settings["num_folds"])
+    )
+
+    print(
+        f"Dataset | GAT mean | GATv2 mean | "
+        f"{fold_columns} | Mean difference | Sample SD"
+    )
+
+    for dataset_name in datasets:
+        gat_results = reference_gat_groups[dataset_name]
+        gatv2_results = reference_gatv2_groups[dataset_name]
+
+        gat_accuracies = np.array(
+            [result["outer_test"]["accuracy"] for result in gat_results]
+        ) * 100
+        gatv2_accuracies = np.array(
+            [result["outer_test"]["accuracy"] for result in gatv2_results]
+        ) * 100
+
+        differences = get_paired_accuracy_differences(
+            gat_results,
+            gatv2_results,
+            dataset_name,
+        )
+
+        fold_values = " | ".join(
+            f"{difference:.2f}"
+            for difference in differences
+        )
+
+        print(
+            f"{dataset_name} | "
+            f"{gat_accuracies.mean():.2f} | "
+            f"{gatv2_accuracies.mean():.2f} | "
+            f"{fold_values} | "
+            f"{differences.mean():.2f} | "
+            f"{differences.std(ddof=1):.2f}"
+        )
+
+
+def print_gat_gatv2_parameter_comparison(
+    reference_gat_groups,
+    reference_gatv2_groups,
+):
+    print("Parameter counts:")
+    print(
+        "Dataset | GAT total | GAT trainable | "
+        "GATv2 total | GATv2 trainable | GATv2 minus GAT"
+    )
+
+    for dataset_name in datasets:
+        gat_parameters = reference_gat_groups[dataset_name][0]["parameters"]
+        gatv2_parameters = reference_gatv2_groups[dataset_name][0]["parameters"]
+
+        print(
+            f"{dataset_name} | "
+            f"{gat_parameters['total']} | "
+            f"{gat_parameters['trainable']} | "
+            f"{gatv2_parameters['total']} | "
+            f"{gatv2_parameters['trainable']} | "
+            f"{gatv2_parameters['total'] - gat_parameters['total']}"
+        )
+
+
 def main():
     groups = []
     reference_gat_groups = {}
+    reference_gatv2_groups = {}
     dataset_information = {}
 
     for dataset_name in datasets:
@@ -317,6 +421,9 @@ def main():
 
             if model_name == "GAT":
                 reference_gat_groups[dataset_name] = results
+
+            if model_name == "GATv2":
+                reference_gatv2_groups[dataset_name] = results
 
     all_results = [
         result
@@ -432,6 +539,37 @@ def main():
         head_groups,
         "Heads",
         "heads",
+    )
+
+    rq2_results = []
+
+    for dataset_name in datasets:
+        rq2_results.extend(reference_gat_groups[dataset_name])
+        rq2_results.extend(reference_gatv2_groups[dataset_name])
+
+    check_runtime_conditions(rq2_results)
+
+    print()
+    print("RQ2 matched GAT and GATv2:")
+    print("Validated reused reference fits:", len(rq2_results))
+    print("New fits: 0")
+    print("Source commits:")
+
+    for source_commit in sorted(
+        {result["source_commit"] for result in rq2_results}
+    ):
+        print(source_commit)
+
+    print()
+    print_gat_gatv2_accuracy_comparison(
+        reference_gat_groups,
+        reference_gatv2_groups,
+    )
+
+    print()
+    print_gat_gatv2_parameter_comparison(
+        reference_gat_groups,
+        reference_gatv2_groups,
     )
 
 
