@@ -1258,8 +1258,6 @@
 
         - Clone and restore the selected state before development-test assessment
 
-        - These decisions supersede older early-stopping instructions in the supplied governing documents
-
     - Retain MUTAG's established input and development policies
 
         - Categorical node features and connectivity are used

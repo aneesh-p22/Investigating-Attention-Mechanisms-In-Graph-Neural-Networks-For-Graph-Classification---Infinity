@@ -537,4 +537,26 @@
 
     - The supported overall conclusion is that attention-design effects depend on the dataset and experimental condition. The evidence does not establish a universally preferable head count, a consistent GATv2 advantage or a universal benefit or dispensability of learned attention.
 
+- Code and evidence audit:
+
+    - Audited all 33 active Python files against the implemented methodology and preserved experimental evidence. Archived implementations were excluded.
+
+    - Source inspection confirmed fresh models and optimisers per fold, validation-only checkpoint selection, complete 500-epoch fitting, selected-state cloning and restoration, graph-weighted metrics and the declared training-time convention. No fold-level leakage or selection error was identified.
+
+    - Confirmed the model dimensions, operator settings and attention controls. The head-count study retained fixed total width, GATv2 retained separate transformations, uniform retraining froze the four zeroed scoring tensors before optimisation, and the fitted intervention changed only those tensors without retraining.
+
+    - Checked all 135 final JSON records. Effective settings, selection metadata, prediction-derived accuracies, timing arithmetic and recorded runtime conditions reconciled. Source identities agreed with the reference, additional-head and uniform-attention result groups.
+
+    - Regenerated the partitions using the preserved graph-label ordering. Fitting, validation and outer-test indices were disjoint and complete, corresponding configurations used matching partitions, and every graph appeared in outer test exactly once.
+
+    - Inspected all 135 paired selected-state files. Tensor names, shapes and parameter totals matched the model definitions, stored tensors were finite, and fixed GIN epsilon buffers remained zero. All 15 uniform-control states retained zero values in the four attention-scoring tensors.
+
+    - Reconciled the RQ4 records for all 5,411 graphs with their reference folds, selected states, labels and learned predictions. Intervention accuracies, prediction-flip rates, recorded loss differences, graph-to-fold averages, sample standard deviations and receiver counts agreed with their constituent values.
+
+    - Reconciled all 27 saved development epoch-budget trajectories. Earliest validation-loss minima, top-ranked epochs, cutoff gaps and the clean aggregate budget findings agreed with the recorded histories.
+
+    - The audit checked source code and preserved evidence without fresh training or model inference. Partition reconstruction used recorded labels rather than an independent dataset reload, and checkpoint inspection did not independently reproduce predictions.
+
+    - No scientific defect or evidence inconsistency requiring a research-code change or experimental rerun was identified. The validated implementation and numerical evidence were retained unchanged.
+
 - Commit: Stage 8 recorded closing decisions and report notes

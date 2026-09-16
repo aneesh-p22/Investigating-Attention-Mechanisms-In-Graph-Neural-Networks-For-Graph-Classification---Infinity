@@ -1074,10 +1074,6 @@
 
 - Updated README.md to describe the implemented Stage 6.4 code, the train_cv.py entry point, inspection locations, archive and outstanding reference fits.
 
-    - The external roadmap and system prompt now agree on the active configuration owner, four-value evaluator, numerical-failure guards, clean audit values, interrupted-run history and elapsed-time wording.
-
-    - The governing log convention now explicitly retains the Commit: prefix requested in the handoff. A suggested summary is not evidence that Git has been run.
-
 - Checked the pre-run corrections without executing cross-validation fits.
 
     - All 33 Python files parsed successfully, and the active imports and evaluator callers matched the renamed runner and four-value interface.
